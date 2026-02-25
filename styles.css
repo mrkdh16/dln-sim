@@ -1,0 +1,407 @@
+/* ──────────────────────────────────────────────────────────
+   Deep Linear Network Simulator — light theme
+   ────────────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #f6f8fa;
+  --panel-bg:     #ffffff;
+  --border:       #d0d7de;
+  --accent:       #0969da;
+  --accent-hover: #0550ae;
+  --purple:       #6e40c9;
+  --text:         #24292f;
+  --text-dim:     #57606a;
+  --text-dimmer:  #8c959f;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+
+#header {
+  padding: 14px 24px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+  flex-shrink: 0;
+}
+
+#header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+#header p {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ── Main content area ───────────────────────────────────── */
+
+#main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Left panel (~1/3 width): canvas + controls ──────────── */
+
+#left-panel {
+  width: 33%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg);
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Canvas occupies upper portion of left panel */
+#canvas-panel {
+  flex: 0 0 48%;
+  position: relative;
+  overflow: hidden;
+}
+
+#main-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Controls panel: fills remaining left-panel space, scrollable */
+#controls-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 0;
+}
+
+/* ── Right panel (~2/3 width): charts stacked vertically ─── */
+
+#right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#charts-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;  /* stacked vertically */
+  overflow: hidden;
+  min-height: 0;
+}
+
+.chart-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  background: var(--panel-bg);
+}
+
+.chart-section:last-child {
+  border-bottom: none;
+}
+
+.chart-section > h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.chart-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  overflow: hidden;
+}
+
+/* ── SV section header (title + pills on same row) ───────── */
+
+.sv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+
+.sv-header h3 {
+  /* override .chart-section > h3 bottom margin (handled by sv-header) */
+  margin-bottom: 0 !important;
+  flex-shrink: 0;
+}
+
+/* ── SV toggle pills ─────────────────────────────────────── */
+
+.sv-toggles {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sv-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  user-select: none;
+  white-space: nowrap;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.sv-toggle-pill:hover {
+  border-color: var(--accent);
+  background: var(--panel-bg);
+}
+
+.sv-toggle-pill input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Sample line segments shown inside pills */
+.pill-line {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  vertical-align: middle;
+}
+
+.pill-solid  { border-bottom: 2px solid var(--text-dim); }
+.pill-dotted { border-bottom: 2px dotted var(--text-dim); }
+.pill-dashed { border-bottom: 2px dashed var(--text-dim); }
+
+/* ── SV panel extras ─────────────────────────────────────── */
+
+.hint {
+  font-size: 11.5px;
+  color: var(--text-dimmer);
+  font-style: italic;
+  line-height: 1.6;
+  flex-shrink: 0;
+  margin-bottom: 6px;
+}
+
+.theory-row {
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+
+.btn {
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--panel-bg);
+  color: var(--text);
+  transition: background 0.1s, border-color 0.1s;
+  white-space: nowrap;
+}
+
+.btn:hover { background: #f3f4f6; }
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.btn-primary:hover    { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-primary.running  { background: #0550ae; border-color: #0550ae; }
+
+.btn-sm {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+/* ── Controls layout inside left panel ───────────────────── */
+
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+/* Grow to fill available row width (for sliders) */
+.ctrl-grow {
+  flex: 1;
+}
+
+.ctrl-label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.ctrl-val {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text);
+  min-width: 42px;
+}
+
+.slider {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.slider-wide {
+  width: 100px;
+}
+
+input[type="number"] {
+  width: 48px;
+  padding: 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  text-align: right;
+}
+
+input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── Section labels within controls ─────────────────────── */
+
+.ctrl-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dimmer);
+  padding-top: 8px;
+  padding-bottom: 2px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Metrics ─────────────────────────────────────────────── */
+
+.metric-group {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.metric-label {
+  font-size: 10px;
+  color: var(--text-dimmer);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.metric-val {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ── Resizable panel dividers ────────────────────────────── */
+
+.panel-divider {
+  flex-shrink: 0;
+  background: var(--border);
+  transition: background 0.12s;
+  position: relative;
+  z-index: 10;
+}
+
+.panel-divider:hover,
+.panel-divider.dragging {
+  background: var(--accent);
+}
+
+/* Vertical bar between left and right panels */
+.panel-divider-h {
+  width: 5px;
+  cursor: col-resize;
+}
+
+/* Horizontal bar between canvas and controls */
+.panel-divider-v {
+  height: 5px;
+  cursor: row-resize;
+}
+
+/* Prevent text selection while dragging */
+body.resizing-h { user-select: none; cursor: col-resize; }
+body.resizing-v { user-select: none; cursor: row-resize; }
