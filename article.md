@@ -76,7 +76,7 @@ $$
 \end{align*}
 $$
 The effective singular value $\hat{s}_\alpha(t) \equiv a_\alpha(t) b_\alpha(t)$ represents the network's current strength along mode $\alpha$, i.e. the corresponding diagonal entry of $W_2 W_1$ in the SVD basis.
-#### A separable ODE
+#### A Separable ODE
 Using the product rule on $\hat{s}_\alpha = a_\alpha b_\alpha$, and the approximation $a_\alpha \approx b_\alpha$ (valid for small, balanced initialization):
 $$
 \frac{d\hat{s}_\alpha}{dt} = b_\alpha^2(s_\alpha - \hat{s}_\alpha) + a_\alpha^2(s_\alpha - \hat{s}_\alpha) \approx 2\hat{s}_\alpha(s_\alpha - \hat{s}_\alpha). \tag{9}
