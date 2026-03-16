@@ -109,8 +109,8 @@ function updateSVChart() {
   const pts1L   = show1L ? downsample(svHistory1L, 300) : [];
   const numSVs1 = show1L && pts1L.length > 0 ? pts1L[pts1L.length - 1].svs.length : 0;
 
-  // Saxe theory overlay: only valid for depth=2
-  const needTheory = isE2E && depth === 2
+  // Saxe theory overlay: valid for all depths (exact for L≤2, ODE for L≥3)
+  const needTheory = isE2E
                   && targetSVs.length > 0 && initE2ESVs.length > 0;
 
   // Total datasets: deep + shallow(1L) + theory

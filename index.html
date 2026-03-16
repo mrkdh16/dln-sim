@@ -4,175 +4,218 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Deep Linear Network Simulator</title>
+
+  <!-- KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <button class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-moon"></i></button>
 
-  <!-- ── Header ──────────────────────────────────────────────────────────── -->
-  <div id="header">
-    <h1>Deep Linear Network Simulator</h1>
-    <p>Simulate gradient descent on deep linear networks. Configure the architecture below, start training, and observe singular value dynamics.</p>
+  <script>
+    // Apply saved theme immediately (before render) to avoid flash
+    (function() {
+      var t = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       ARTICLE SECTION — content loaded from article.md
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="article">
+    <div class="article-inner" id="article-inner"></div>
   </div>
 
-  <!-- ── Main: left panel + right panel ──────────────────────────────────── -->
-  <div id="main">
 
-    <!-- LEFT PANEL: canvas on top, controls below -->
-    <div id="left-panel">
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       WIDGET SECTION (bordered app window)
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="widget-container">
+  <div id="widget-section">
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
+    <div id="header">
+      <h1>Deep Linear Network Simulator</h1>
+      <p>Configure the architecture below, start training, and observe singular value dynamics. Click any weight matrix on the canvas to inspect its singular values.</p>
+    </div>
 
-      <!-- Network visualization canvas -->
-      <div id="canvas-panel">
-        <canvas id="main-canvas"></canvas>
-      </div>
+    <!-- ── Main: left panel + right panel ──────────────────────────────── -->
+    <div id="main">
 
-      <!-- Vertical drag handle (canvas ↔ controls) -->
-      <div class="panel-divider panel-divider-v" id="left-divider"></div>
+      <!-- LEFT PANEL: canvas on top, controls below -->
+      <div id="left-panel">
 
-      <!-- Controls panel -->
-      <div id="controls-panel">
-
-        <!-- Action buttons -->
-        <div class="ctrl-row">
-          <button id="start-btn" class="btn btn-primary">start</button>
-          <button id="reset-btn" class="btn">reset</button>
+        <!-- Network visualization canvas -->
+        <div id="canvas-panel">
+          <canvas id="main-canvas"></canvas>
+          <div id="canvas-labels"></div>
         </div>
 
-        <!-- Architecture section -->
-        <div class="ctrl-section-label">Architecture</div>
+        <!-- Vertical drag handle (canvas ↔ controls) -->
+        <div class="panel-divider panel-divider-v" id="left-divider"></div>
 
-        <div class="ctrl-row">
-          <div class="ctrl-group">
-            <span class="ctrl-label">input dim</span>
-            <input type="number" id="input-dim" value="8" min="1" max="512">
+        <!-- Controls panel -->
+        <div id="controls-panel">
+
+          <!-- Action buttons -->
+          <div class="ctrl-row">
+            <button id="start-btn" class="btn btn-primary">start</button>
+            <button id="reset-btn" class="btn">reset</button>
           </div>
-          <div class="ctrl-group">
-            <span class="ctrl-label">output dim</span>
-            <input type="number" id="output-dim" value="8" min="1" max="512">
-          </div>
-          <div class="ctrl-group">
-            <span class="ctrl-label">depth</span>
-            <input type="number" id="depth-input" value="2" min="1" max="10">
-          </div>
-        </div>
 
-        <div class="ctrl-row">
-          <div class="ctrl-group ctrl-grow">
-            <span class="ctrl-label">hidden dim</span>
-            <input type="range" id="hidden-dim-slider" class="slider slider-wide" min="0" max="100" value="32">
-            <span id="hidden-dim-display" class="ctrl-val">—</span>
-          </div>
-          <button id="apply-btn" class="btn btn-sm">apply</button>
-        </div>
+          <!-- Architecture section -->
+          <div class="ctrl-section-label">Architecture</div>
 
-        <!-- Training hyperparameters section -->
-        <div class="ctrl-section-label">Hyperparameters</div>
-
-        <div class="ctrl-row">
-          <div class="ctrl-group ctrl-grow">
-            <span class="ctrl-label">learning rate</span>
-            <input type="range" id="lr-slider" class="slider slider-wide" min="0" max="100" value="36">
-            <span id="lr-display" class="ctrl-val">—</span>
-          </div>
-        </div>
-
-        <div class="ctrl-row">
-          <div class="ctrl-group ctrl-grow">
-            <span class="ctrl-label">init scale</span>
-            <input type="range" id="scale-slider" class="slider slider-wide" min="0" max="100" value="50">
-            <span id="scale-display" class="ctrl-val">—</span>
-          </div>
-        </div>
-
-        <div class="ctrl-row">
-          <label class="toggle-label">
-            <input type="checkbox" id="isotropic-toggle" checked>
-            <p>Whiten uncentered covariance matrix of input (&Sigma; xx^T = I; necessary assumption for Saxe et al. theory)</p>
-          </label>
-        </div>
-
-        <!-- Metrics section -->
-        <div class="ctrl-section-label">Metrics</div>
-
-        <div class="metric-group">
-          <div class="metric-item">
-            <span class="metric-label">loss</span>
-            <span id="loss-display" class="metric-val">—</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-label">step</span>
-            <span id="iter-display" class="metric-val">—</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-label">steps/s</span>
-            <span id="steprate-display" class="metric-val">—</span>
-          </div>
-        </div>
-
-      </div><!-- /controls-panel -->
-    </div><!-- /left-panel -->
-
-    <!-- Horizontal drag handle (left ↔ right panels) -->
-    <div class="panel-divider panel-divider-h" id="main-divider"></div>
-
-    <!-- RIGHT PANEL: charts stacked vertically -->
-    <div id="right-panel">
-      <div id="charts-panel">
-
-        <!-- Loss chart (top) -->
-        <div class="chart-section" id="loss-section">
-          <h3>loss</h3>
-          <div class="chart-wrap">
-            <canvas id="loss-chart"></canvas>
-          </div>
-        </div>
-
-        <!-- Singular value chart (bottom) -->
-        <div class="chart-section" id="sv-section">
-
-          <div class="sv-header">
-            <h3 id="sv-chart-title">singular values</h3>
-            <!-- Toggle pills — shown once a matrix is selected -->
-            <div class="sv-toggles" id="sv-toggles" style="display:none">
-              <label class="sv-toggle-pill">
-                <input type="checkbox" id="show-deep-toggle" checked>
-                <span class="pill-line pill-solid"></span>
-                Deep
-              </label>
-              <label class="sv-toggle-pill">
-                <input type="checkbox" id="show-theory-toggle" checked>
-                <span class="pill-line pill-dotted"></span>
-                Theory
-              </label>
-              <label class="sv-toggle-pill">
-                <input type="checkbox" id="show-shallow-toggle">
-                <span class="pill-line pill-dashed"></span>
-                Shallow
-              </label>
+          <div class="ctrl-row">
+            <div class="ctrl-group">
+              <span class="ctrl-label">input dim</span>
+              <input type="number" id="input-dim" value="8" min="1" max="512">
+            </div>
+            <div class="ctrl-group">
+              <span class="ctrl-label">output dim</span>
+              <input type="number" id="output-dim" value="8" min="1" max="512">
+            </div>
+            <div class="ctrl-group">
+              <span class="ctrl-label">depth</span>
+              <input type="number" id="depth-input" value="2" min="1" max="10">
             </div>
           </div>
 
-          <p id="sv-hint" class="hint">Click a matrix on the canvas to view its singular value history.</p>
-
-          <div class="chart-wrap" id="sv-chart-wrap" style="display:none">
-            <canvas id="sv-chart"></canvas>
+          <div class="ctrl-row">
+            <div class="ctrl-group ctrl-grow">
+              <span class="ctrl-label">hidden dim</span>
+              <input type="range" id="hidden-dim-slider" class="slider slider-wide" min="0" max="100" value="32">
+              <span id="hidden-dim-display" class="ctrl-val">—</span>
+            </div>
+            <button id="apply-btn" class="btn btn-sm">apply</button>
           </div>
 
-          <!-- Theory formula — shown only for e2e selection with depth=2 -->
-          <div id="theory-row" class="theory-row" style="display:none">
-            <p class="hint" style="margin-top:5px">
-              Exact for L=2: u<sub>α</sub>(k) = s<sub>α</sub> / (1 + (s<sub>α</sub>/u<sub>α</sub>⁰ &minus; 1) e<sup>&minus;2s<sub>α</sub>&eta;k</sup>).
-              When &Sigma;<sub>x</sub>&nbsp;&ne;&nbsp;I, s<sub>α</sub> = SVD(W*A) and u<sub>α</sub> = SVD(W<sub>e2e</sub>&thinsp;A).
+          <!-- Training hyperparameters section -->
+          <div class="ctrl-section-label">Hyperparameters</div>
+
+          <div class="ctrl-row">
+            <div class="ctrl-group ctrl-grow">
+              <span class="ctrl-label">learning rate</span>
+              <input type="range" id="lr-slider" class="slider slider-wide" min="0" max="100" value="36">
+              <span id="lr-display" class="ctrl-val">—</span>
+            </div>
+          </div>
+
+          <div class="ctrl-row">
+            <div class="ctrl-group ctrl-grow">
+              <span class="ctrl-label">init scale</span>
+              <input type="range" id="scale-slider" class="slider slider-wide" min="0" max="100" value="50">
+              <span id="scale-display" class="ctrl-val">—</span>
+            </div>
+          </div>
+
+          <div class="ctrl-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="isotropic-toggle" checked>
+              <p>Whiten uncentered covariance matrix of input ($\Sigma_{xx}=I$; necessary assumption for Saxe et al. theory)</p>
+            </label>
+          </div>
+
+          <!-- Metrics section -->
+          <!-- <div class="ctrl-section-label">Metrics</div>
+
+          <div class="metric-group">
+            <div class="metric-item">
+              <span class="metric-label">loss</span>
+              <span id="loss-display" class="metric-val">—</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">step</span>
+              <span id="iter-display" class="metric-val">—</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">steps/s</span>
+              <span id="steprate-display" class="metric-val">—</span>
+            </div>
+          </div> -->
+
+        </div><!-- /controls-panel -->
+      </div><!-- /left-panel -->
+
+      <!-- Horizontal drag handle (left ↔ right panels) -->
+      <div class="panel-divider panel-divider-h" id="main-divider"></div>
+
+      <!-- RIGHT PANEL: charts stacked vertically -->
+      <div id="right-panel">
+        <div id="charts-panel">
+
+          <!-- Loss chart (top) -->
+          <div class="chart-section" id="loss-section">
+            <h3>loss</h3>
+            <div class="chart-wrap">
+              <canvas id="loss-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Singular value chart (bottom) -->
+          <div class="chart-section" id="sv-section">
+
+            <div class="sv-header">
+              <h3 id="sv-chart-title">singular values</h3>
+              <!-- Toggle pills — shown once a matrix is selected -->
+              <div class="sv-toggles" id="sv-toggles" style="display:none">
+                <label class="sv-toggle-pill">
+                  <input type="checkbox" id="show-deep-toggle" checked>
+                  <span class="pill-line pill-solid"></span>
+                  Deep
+                </label>
+                <label class="sv-toggle-pill">
+                  <input type="checkbox" id="show-theory-toggle" checked>
+                  <span class="pill-line pill-dotted"></span>
+                  Theory
+                </label>
+                <label class="sv-toggle-pill">
+                  <input type="checkbox" id="show-shallow-toggle">
+                  <span class="pill-line pill-dashed"></span>
+                  Shallow
+                </label>
+              </div>
+            </div>
+
+            <p id="sv-hint" class="hint">Click a matrix on the canvas to view its singular value history.</p>
+
+            <div class="chart-wrap" id="sv-chart-wrap" style="display:none">
+              <canvas id="sv-chart"></canvas>
+            </div>
+
+            <!-- Theory formula — shown only for e2e selection with depth=2 -->
+            <div id="theory-row" class="theory-row" style="display:none">
+            <p id="theory-formula-L2" class="hint" style="margin-top:5px">
+                Saxe et al. Eq.&nbsp;12 for $L=2$: $\hat{s}_\alpha(k) = \dfrac{s_\alpha}{1 + \left(\frac{s_\alpha}{\hat{s}_\alpha^0} - 1\right)e^{-2s_\alpha \eta k}}$.
+                When $\Sigma_{xx} \neq I$, $s_\alpha$ and $\hat{s}_\alpha$ are singular values of $W^* A$ and $W_{\text{total}} A$.
             </p>
-          </div>
+            <p id="theory-formula-deep" class="hint" style="margin-top:5px">
+                Numerical integration of Saxe et al. Eq.&nbsp;15: $\;\dfrac{du_\alpha}{dk} = \eta \, L \, u_\alpha^{\,2-2/L}(s_\alpha - u_\alpha)$,
+                where $L$ is the number of weight matrices.
+                Exact on the balanced, decoupled invariant manifold ($a_i = u^{1/L}$); approximate from random init.
+                When $\Sigma_{xx} \neq I$, $s_\alpha$ and $u_\alpha$ are singular values of $W^* A$ and $W_{\text{total}} A$.
+            </p>
+            </div>
 
-        </div><!-- /sv-section -->
+          </div><!-- /sv-section -->
 
-      </div><!-- /charts-panel -->
-    </div><!-- /right-panel -->
+        </div><!-- /charts-panel -->
+      </div><!-- /right-panel -->
 
-  </div><!-- /main -->
+    </div><!-- /main -->
 
-  <!-- Dependencies -->
+  </div><!-- /widget-section -->
+  </div><!-- /widget-container -->
+
+
+  <!-- ── Dependencies ────────────────────────────────────────────────────── -->
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/lib/marked.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/numeric@1.2.6/numeric-1.2.6.min.js"></script>
@@ -184,5 +227,61 @@
   <script src="js/charts.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/main.js"></script>
+
+  <!-- Theme toggle -->
+  <script>
+    function toggleTheme() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      var icon = document.querySelector('.theme-toggle i');
+      icon.className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var saved = localStorage.getItem('theme') || 'light';
+      var icon = document.querySelector('.theme-toggle i');
+      icon.className = saved === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    });
+  </script>
+
+  <!-- Render math and load article -->
+  <script>
+    const KATEX_OPTS = {
+      delimiters: [
+        { left: '$$', right: '$$', display: true  },
+        { left: '$',  right: '$',  display: false }
+      ],
+      throwOnError: false
+    };
+
+    // Render widget math (static HTML present at load time)
+    renderMathInElement(document.getElementById('widget-section'), KATEX_OPTS);
+
+    // Protect math delimiters from Markdown parser, restore after parse.
+    function renderMarkdown(md) {
+      const saved = [];
+      const ph = i => `\x00M${i}\x00`;
+      md = md.replace(/\$\$([\s\S]*?)\$\$/g, m => { saved.push(m); return ph(saved.length - 1); });
+      md = md.replace(/\$([^\n$]+?)\$/g,      m => { saved.push(m); return ph(saved.length - 1); });
+      let html = marked.parse(md);
+      html = html.replace(/\x00M(\d+)\x00/g, (_, i) => saved[+i]);
+      return html;
+    }
+
+    fetch('article.md')
+      .then(r => r.text())
+      .then(md => {
+        document.getElementById('article-inner').innerHTML = renderMarkdown(md);
+        renderMathInElement(document.getElementById('article'), KATEX_OPTS);
+      })
+      .catch(e => {
+        document.getElementById('article-inner').innerHTML =
+          '<p style="color:red;padding:20px">Article render error: ' + e.message + '</p>';
+        console.error('Article render error:', e);
+      });
+  </script>
+
 </body>
 </html>

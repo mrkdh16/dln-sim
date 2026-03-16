@@ -9,7 +9,7 @@
 //  x ──[trapezoid]──[trapezoid]──…──[trapezoid]──▶ y
 //       SV bars    SV bars             SV bars
 //
-//               [  W_e2e trapezoid  ]
+//               [  W_total trapezoid  ]
 //                    SV bars
 //
 // Each trapezoid reflects the actual input/output dimensions of that
@@ -71,6 +71,33 @@ const SV_COLORS = [
   '#6e40c9', '#953800',
 ];
 
+// ── KaTeX label overlay ──────────────────────────────────────────────────────
+// Instead of ctx.fillText for matrix names, we collect label specs here and
+// flush them to a positioned DOM overlay so KaTeX can render them.
+
+let _pendingLabels = [];
+
+function _addLabel(x, y, tex, color, fontSize, isCaption) {
+  _pendingLabels.push({ x, y, tex, color, fontSize, isCaption: !!isCaption });
+}
+
+function _flushLabels() {
+  const overlay = document.getElementById('canvas-labels');
+  if (!overlay) return;
+  overlay.innerHTML = '';
+  for (const { x, y, tex, color, fontSize, isCaption } of _pendingLabels) {
+    const div = document.createElement('div');
+    div.className = 'canvas-label' + (isCaption ? ' canvas-label-caption' : '');
+    div.style.left     = x + 'px';
+    div.style.top      = y + 'px';
+    div.style.color    = color;
+    div.style.fontSize = fontSize + 'px';
+    div.innerHTML = katex.renderToString(tex, { throwOnError: false, displayMode: false });
+    overlay.appendChild(div);
+  }
+  _pendingLabels = [];
+}
+
 // ── Main draw ────────────────────────────────────────────────────────────────
 
 function draw() {
@@ -82,7 +109,8 @@ function draw() {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvasW, canvasH);
 
-  matrixBoxes = [];
+  matrixBoxes    = [];
+  _pendingLabels = [];
 
   const depth  = getDepth();
   const margin = 44;
@@ -122,18 +150,17 @@ function draw() {
     const boxH   = Math.max(lH, rH);
     matrixBoxes.push({ x: tx, y: boxTop, w: trapW, h: boxH, idx: i });
 
-    // Matrix label
-    const innerH = Math.min(lH, rH);
+    // Matrix label — KaTeX overlay
+    const innerH   = Math.min(lH, rH);
     const fontSize = Math.min(12, Math.max(8, innerH * 0.28));
-    ctx.fillStyle = isSelected ? '#ffffff' : '#24292f';
-    ctx.font      = `bold ${fontSize}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`W${sub(i + 1)}`, tx + trapW / 2, chainY + 2);
+    _addLabel(tx + trapW / 2, chainY, `W_{${i + 1}}`,
+              isSelected ? '#ffffff' : '#24292f', fontSize);
 
     if (innerH > 28) {
       ctx.fillStyle = isSelected ? 'rgba(255,255,255,0.8)' : '#57606a';
       ctx.font      = `${Math.max(8, fontSize - 2)}px monospace`;
-      ctx.fillText(`${dims[i + 1]}×${dims[i]}`, tx + trapW / 2, chainY + fontSize + 4);
+      ctx.textAlign = 'center';
+      ctx.fillText(`${dims[i + 1]}×${dims[i]}`, tx + trapW / 2, chainY + fontSize + 10);
     }
 
     // SV bars below chain
@@ -162,20 +189,18 @@ function draw() {
   ctx.fillText('y', endX + 18, chainY + 5);
 
   // ── End-to-end product ────────────────────────────────────────────────────
-  const e2eLH     = dimH(dims[0]);
-  const e2eRH     = dimH(dims[depth]);
-  const e2eMaxH   = Math.max(e2eLH, e2eRH);
-  const e2eTrapW  = Math.min(trapW * 1.15, 120);
-  const e2eX      = canvasW / 2 - e2eTrapW / 2;
-  const svBotY    = chainY + maxHalfH + 12 + 44; // bottom of chain SV bars
-  const e2eY      = svBotY + 16 + e2eMaxH / 2;   // center of e2e trapezoid
-  const isE2ESel  = (selectedMatrixIdx === depth);
+  const e2eLH    = dimH(dims[0]);
+  const e2eRH    = dimH(dims[depth]);
+  const e2eMaxH  = Math.max(e2eLH, e2eRH);
+  const e2eTrapW = Math.min(trapW * 1.15, 120);
+  const e2eX     = canvasW / 2 - e2eTrapW / 2;
+  const svBotY   = chainY + maxHalfH + 12 + 44; // bottom of chain SV bars
+  const e2eY     = svBotY + 16 + e2eMaxH / 2;   // center of e2e trapezoid
+  const isE2ESel = (selectedMatrixIdx === depth);
 
-  // "W_e2e = W_L ··· W₁" label above the e2e box
-  ctx.fillStyle = '#8c959f';
-  ctx.font      = '10px -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('W_e2e = W_L ··· W₁', canvasW / 2, e2eY - e2eMaxH / 2 - 7);
+  // Caption above the e2e box — KaTeX overlay
+  _addLabel(canvasW / 2, e2eY - e2eMaxH / 2 - 14,
+    'W_{\\text{total}} = W_L \\cdots W_1', '#8c959f', 10, true);
 
   drawTrapezoid(ctx, e2eX, e2eY, e2eTrapW, e2eLH, e2eRH, isE2ESel, true);
 
@@ -184,20 +209,23 @@ function draw() {
     w: e2eTrapW, h: e2eMaxH, idx: depth,
   });
 
-  // e2e labels
-  const e2eInner = Math.min(e2eLH, e2eRH);
-  ctx.fillStyle = isE2ESel ? '#ffffff' : '#24292f';
-  ctx.font      = `bold ${Math.min(12, Math.max(8, e2eInner * 0.28))}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.fillText('W_e2e', canvasW / 2, e2eY + 2);
+  // e2e label inside box — KaTeX overlay
+  const e2eInner  = Math.min(e2eLH, e2eRH);
+  const e2eFontSz = Math.min(12, Math.max(8, e2eInner * 0.28));
+  _addLabel(canvasW / 2, e2eY, 'W_{\\text{total}}',
+            isE2ESel ? '#ffffff' : '#24292f', e2eFontSz);
+
   ctx.fillStyle = isE2ESel ? 'rgba(255,255,255,0.8)' : '#57606a';
   ctx.font      = '9px monospace';
-  ctx.fillText(`${dims[depth]}×${dims[0]}`, canvasW / 2, e2eY + 13);
+  ctx.textAlign = 'center';
+  ctx.fillText(`${dims[depth]}×${dims[0]}`, canvasW / 2, e2eY + e2eFontSz + 10);
 
   const e2eSVs = latestSVs(depth);
   if (e2eSVs) {
     drawSVBars(ctx, e2eX, e2eY + e2eMaxH / 2 + 10, e2eTrapW, 44, e2eSVs);
   }
+
+  _flushLabels();
 }
 
 // ── Drawing primitives ────────────────────────────────────────────────────────
@@ -325,14 +353,19 @@ function refreshSVPanel() {
   const hasHistory = svHistories[selectedMatrixIdx] &&
                      svHistories[selectedMatrixIdx].length > 0;
 
-  // Update title
-  titleEl.textContent = isE2E
-    ? 'W_e2e — effective singular values'
-    : `W${sub(selectedMatrixIdx + 1)} — singular values`;
+  // Update title (render matrix name with KaTeX)
+  const matTeX = isE2E
+    ? 'W_{\\text{total}}'
+    : `W_{${selectedMatrixIdx + 1}}`;
+  titleEl.innerHTML = katex.renderToString(matTeX, { throwOnError: false })
+    + (isE2E ? ' — effective singular values' : ' — singular values');
 
-  // Theory formula row: visible only for e2e with depth=2
-  // (Saxe et al. formula is exact only for the depth-2 case)
-  theoryRow.style.display = (isE2E && depth === 2) ? '' : 'none';
+  // Theory formula row: visible for e2e at depth ≥ 2
+  theoryRow.style.display = (isE2E && depth >= 2) ? '' : 'none';
+  const formulaL2   = document.getElementById('theory-formula-L2');
+  const formulaDeep = document.getElementById('theory-formula-deep');
+  if (formulaL2)   formulaL2.style.display   = (depth === 2) ? '' : 'none';
+  if (formulaDeep) formulaDeep.style.display  = (depth > 2)  ? '' : 'none';
 
   if (hasHistory) {
     hintEl.style.display = 'none';

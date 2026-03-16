@@ -61,15 +61,20 @@ function fmtLoss(v) {
 }
 
 function updateMetricsDisplay(loss) {
-  document.getElementById('loss-display').innerHTML   = fmtLoss(loss);
-  document.getElementById('iter-display').textContent = loss !== null ? iterationCount : '—';
+  const lossEl = document.getElementById('loss-display');
+  const iterEl = document.getElementById('iter-display');
+  const rateEl = document.getElementById('steprate-display');
+  if (lossEl) lossEl.innerHTML   = fmtLoss(loss);
+  if (iterEl) iterEl.textContent = loss !== null ? iterationCount : '—';
 
-  if (stepTimestamps.length >= 2) {
-    const span        = stepTimestamps[stepTimestamps.length - 1] - stepTimestamps[0];
-    const stepsPerSec = ((stepTimestamps.length - 1) / (span / 1000)) * STEPS_PER_FRAME;
-    document.getElementById('steprate-display').textContent = Math.round(stepsPerSec);
-  } else {
-    document.getElementById('steprate-display').textContent = '—';
+  if (rateEl) {
+    if (stepTimestamps.length >= 2) {
+      const span        = stepTimestamps[stepTimestamps.length - 1] - stepTimestamps[0];
+      const stepsPerSec = ((stepTimestamps.length - 1) / (span / 1000)) * STEPS_PER_FRAME;
+      rateEl.textContent = Math.round(stepsPerSec);
+    } else {
+      rateEl.textContent = '—';
+    }
   }
 }
 

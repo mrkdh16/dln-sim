@@ -63,39 +63,113 @@ function initSimulation() {
   iterationCount = 0;
   stepTimestamps = [];
   lastChartUpdate = 0;
+  _deepODECache   = new Map(); // invalidate deep-ODE theory cache
 }
 
 // ── Saxe et al. (2014) theoretical singular value trajectory ─────────────────
 //
-// Depth L = 1 (single weight matrix):
-//   u_α(k) = s_α + (u_α^0 − s_α) · exp(−2ηk)          [linear approach]
+// Depth L = 1 (single weight matrix, linear ODE):
+//   u_α(k) = s_α + (u_α^0 − s_α) · exp(−2ηk)
 //
-// Depth L = 2 (Saxe et al. exact formula, balanced initialisation):
-//   u_α(k) = s_α / (1 + (s_α/u_α^0 − 1) · exp(−2 s_α η k))  [logistic]
+// Depth L = 2 (Saxe et al. Eq. 12, exact closed form, balanced init):
+//   u_α(k) = s_α / (1 + (s_α/u_α^0 − 1) · exp(−2 s_α η k))
 //
-// Depth L ≥ 3:  above formula used as approximation; convergence time scale
-//               changes but qualitative sigmoidal shape persists.
+// Depth L ≥ 3 (Saxe et al. Eq. 15, numerical integration):
+//   τ du/dt = L · u^{2−2/L} · (s − u)
 //
-// s_α = α-th SV of target W*, u_α^0 = initial e2e SV, η = learning rate, k = step.
+//   where L = depth = number of weight matrices (paper's N_l − 1),
+//   τ = 1/η, and the exponent 2−2/L comes from the balanced-init
+//   constraint a_i = u^{1/L}.
+//
+// s_α = α-th SV of target W*, u_α^0 = initial e2e SV, η = learning rate,
+// k = step (discrete iteration count).
+//
 // Returns an array of u_α values evaluated at the iterations in `iters`.
+
 function saxeTheoretical(alpha, iters) {
   const sA    = targetSVs[alpha];
   const u0A   = initE2ESVs[alpha];
-  const depth = getDepth();
+  const depth = getDepth();  // L = number of weight matrices
 
   if (sA == null || u0A == null || sA < 0) return iters.map(() => 0);
 
+  // ── L = 1: linear (exponential approach) ────────────────────────────────
   if (depth === 1) {
-    // u_α(k) = sA + (u0A - sA) * exp(-2 * η * k)
     return iters.map(k => sA + (u0A - sA) * Math.exp(-2 * learningRate * k));
   }
 
-  // depth ≥ 2: logistic (exact for L=2, approximate for L>2)
   if (u0A <= 0) return iters.map(() => 0);
-  return iters.map(k => {
-    const e = Math.exp(-4 * sA * learningRate * k);
-    return sA / (1 + (sA / u0A - 1) * e);
-  });
+
+  // ── L = 2: exact logistic (Saxe Eq. 12) ────────────────────────────────
+  if (depth === 2) {
+    return iters.map(k => {
+      const e = Math.exp(-4 * sA * learningRate * k);
+      return sA / (1 + (sA / u0A - 1) * e);
+    });
+  }
+
+  // ── L ≥ 3: numerical integration of the deep ODE (Saxe Eq. 15) ─────────
+  //
+  //   du/dk = η · L · u^{2−2/L} · (s − u)
+  //
+  // We integrate forward with RK4 from k=0 to max(iters), sampling at each
+  // requested iteration.  The step size is 1 (one gradient-descent iteration),
+  // which is fine because η is small.
+
+  return _integrateDeepODE(sA, u0A, depth, learningRate, iters);
+}
+
+// Cache for the deep-ODE integration so we don't re-integrate every chart
+// frame for every SV index.  Keyed by (alpha, depth, lr) — invalidated on
+// reset because initE2ESVs / targetSVs change.
+let _deepODECache = new Map();
+
+function _deepODECacheKey(sA, u0A, depth, lr) {
+  // Use truncated floats as key (plenty of precision for cache hits)
+  return `${sA.toPrecision(10)}_${u0A.toPrecision(10)}_${depth}_${lr.toPrecision(10)}`;
+}
+
+function _integrateDeepODE(sA, u0A, L, lr, iters) {
+  if (iters.length === 0) return [];
+
+  const key = _deepODECacheKey(sA, u0A, L, lr);
+  let cached = _deepODECache.get(key);
+
+  const maxIter = iters[iters.length - 1]; // iters assumed sorted ascending
+
+  // If cache exists and covers enough iterations, just sample from it
+  if (cached && cached.length > maxIter) {
+    return iters.map(k => cached[Math.min(k, cached.length - 1)]);
+  }
+
+  // RHS of the ODE:  du/dk = lr * L * u^{2-2/L} * (s - u)
+  const exponent = 2 - 2 / L;
+  function dudk(u) {
+    if (u <= 0) return 0;
+    return lr * L * Math.pow(u, exponent) * (sA - u);
+  }
+
+  // Integrate with RK4, step size = 1 iteration
+  const startIdx = cached ? cached.length : 0;
+  const trajectory = cached ? cached.slice() : [u0A]; // trajectory[k] = u(k)
+  let u = trajectory[trajectory.length - 1];
+
+  const h = 1; // step size = 1 iteration
+  for (let k = startIdx; k < maxIter; k++) {
+    // Clamp to [0, sA] for numerical safety (u should stay in this range)
+    const k1 = dudk(u);
+    const k2 = dudk(Math.max(0, u + 0.5 * h * k1));
+    const k3 = dudk(Math.max(0, u + 0.5 * h * k2));
+    const k4 = dudk(Math.max(0, u + h * k3));
+    u = u + (h / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
+    u = Math.max(0, Math.min(sA + 1e-6, u)); // soft clamp
+    trajectory.push(u);
+  }
+
+  // Store in cache
+  _deepODECache.set(key, trajectory);
+
+  return iters.map(k => trajectory[Math.min(k, trajectory.length - 1)]);
 }
 
 // ── Forward pass helpers ─────────────────────────────────────────────────────
