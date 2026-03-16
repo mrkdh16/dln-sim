@@ -4,7 +4,7 @@
 
   
 
-Following <a href="https://arxiv.org/pdf/1312.6120" target="_blank">Saxe et al. (2014)</a> and <a href="https://arxiv.org/pdf/1810.10531" target="_blank">Saxe et al. (2018)</a>
+Following <a href="https://arxiv.org/pdf/1312.6120" target="_blank">Saxe et al. (2014)</a>
 
   
 
