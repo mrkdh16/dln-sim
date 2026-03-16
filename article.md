@@ -45,7 +45,7 @@ The learning task has been reduced to **matrix factorization**: gradient descent
 #### Rotating into the Natural Coordinate System
 Equations (3) and (4) form a coupled nonlinear system—a change in any single weight affects every other weight. To solve them, we need to find a coordinate system in which the dynamics *decouple* into independent scalar equations.
 
-Consider the **Singular Value Decomposition** (SVD) of $\Sigma_{xy}$: $\Sigma_{xy} = U S_* V^\top = \sum_{\alpha=1}^{r} s_\alpha\, \mathbf{u}_\alpha \mathbf{v}_\alpha^\top.$ Since the SVD modes of $\Sigma_{xy}$ drive learning, we rotate into their basis.
+Consider the **Singular Value Decomposition** (SVD) of the input-output correlation matrix $\Sigma_{xy} = U S_* V^\top = \sum_{\alpha=1}^{r} s_\alpha\, \mathbf{u}_\alpha \mathbf{v}_\alpha^\top.$ Since the SVD modes of $\Sigma_{xy}$ drive learning, we rotate into their basis.
 
 Define *rotated weight matrices*:
 $$
