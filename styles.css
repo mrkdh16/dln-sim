@@ -142,6 +142,7 @@ html, body {
   font-family: inherit;
   background: var(--bg-color);
   text-align: left;
+  position: relative;
   display: flex;
   flex-direction: column;
   transition: border-color 0.15s, background 0.15s;
@@ -176,6 +177,18 @@ html, body {
 .preset-card.active .preset-card-play-icon {
   color: var(--heading-color);
 }
+.preset-card-reset {
+  display: none;
+  position: absolute;
+  bottom: 7px;
+  right: 9px;
+  font-size: 0.65em;
+  color: var(--meta-color);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.preset-card-reset:hover { color: var(--text-color); }
+
 .preset-card-name {
   font-size: 0.9em;
   font-weight: 600;
@@ -215,6 +228,44 @@ html, body {
   margin-bottom: 5px;
   flex-shrink: 0;
   line-height: 1.4;
+}
+
+/* ── Tooltip term (dotted underline + popup) ─────────────────────────── */
+.tooltip-term {
+  position: relative;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: help;
+  white-space: nowrap;
+}
+.tooltip-content {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px;
+  padding: 7px 10px;
+  background: var(--heading-color);
+  color: var(--bg-color);
+  font-size: 0.85em;
+  font-style: normal;
+  line-height: 1.45;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 100;
+  white-space: normal;
+}
+.tooltip-term:hover .tooltip-content { display: block; }
+
+/* ── Simple widget parameter block ──────────────────────────────────── */
+.simple-params {
+  font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
+  font-size: 0.72em;
+  color: var(--border-color);
+  text-align: center;
+  margin-top: 6px;
+  letter-spacing: 0.02em;
 }
 
 .sv-legend-hint {

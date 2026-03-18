@@ -44,6 +44,7 @@
             </div>
             <div class="preset-card-name">Linear Regression</div>
             <div class="preset-card-desc">exponential loss decay</div>
+            <span class="preset-card-reset"><i class="fas fa-rotate-left"></i></span>
           </button>
           <button class="preset-card" data-preset="depth2">
             <div class="preset-card-header">
@@ -52,6 +53,7 @@
             </div>
             <div class="preset-card-name">Minimally Deep</div>
             <div class="preset-card-desc">analytically tractable</div>
+            <span class="preset-card-reset"><i class="fas fa-rotate-left"></i></span>
           </button>
           <button class="preset-card" data-preset="plateau">
             <div class="preset-card-header">
@@ -60,6 +62,7 @@
             </div>
             <div class="preset-card-name">Deep</div>
             <div class="preset-card-desc">stepwise decrease in loss</div>
+            <span class="preset-card-reset"><i class="fas fa-rotate-left"></i></span>
           </button>
         </div>
 
@@ -73,12 +76,15 @@
               </div>
             </div>
             <div class="simple-chart-section" id="simple-sv-section">
-              <div class="simple-chart-title">singular values of the input-output map</div>
+              <div class="simple-chart-title">singular values of the
+                <span class="tooltip-term">input-output map<span class="tooltip-content">Cross-correlation f(X)X&#7488;/P between network outputs and whitened random inputs X. For a linear network this equals the end-to-end product W&#8343;···W&#8321;. For a nonlinear network it captures the linear component of the learned map.</span></span>
+              </div>
               <div class="simple-chart-wrap">
                 <canvas id="simple-sv-chart"></canvas>
               </div>
             </div>
           </div>
+          <div class="simple-params" id="simple-params"></div>
         </div>
 
         <!-- Right: nonlinear preset cards -->
@@ -91,6 +97,7 @@
             </div>
             <div class="preset-card-name">Shallow ReLU</div>
             <div class="preset-card-desc">piecewise linear</div>
+            <span class="preset-card-reset"><i class="fas fa-rotate-left"></i></span>
           </button>
           <button class="preset-card active" data-preset="relu_deep">
             <div class="preset-card-header">
@@ -99,6 +106,7 @@
             </div>
             <div class="preset-card-name">Deep ReLU</div>
             <div class="preset-card-desc">piecewise linear</div>
+            <span class="preset-card-reset"><i class="fas fa-rotate-left"></i></span>
           </button>
           <button class="preset-card" data-preset="tanh">
             <div class="preset-card-header">
@@ -107,6 +115,7 @@
             </div>
             <div class="preset-card-name">Deep tanh</div>
             <div class="preset-card-desc">smoothly saturating </div>
+            <span class="preset-card-reset"><i class="fas fa-rotate-left"></i></span>
           </button>
         </div>
       </div>

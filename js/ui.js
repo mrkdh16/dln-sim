@@ -242,11 +242,25 @@ function updateMetricsDisplay(loss) {
 // ── Wire up all UI handlers ───────────────────────────────────────────────────
 
 function setupUIHandlers() {
+  // Reset spans inside preset cards
+  document.querySelectorAll('.preset-card-reset').forEach(span => {
+    span.addEventListener('click', e => {
+      e.stopPropagation();
+      s_resetSim();
+      s_startSim();
+    });
+  });
+
   // Preset cards drive the SIMPLE widget's independent simulation
   document.querySelectorAll('.preset-card').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.classList.contains('active')) {
-        s_isRunning ? s_pauseSim() : s_startSim();
+        if (s_completed) {
+          s_resetSim();
+          s_startSim();
+        } else {
+          s_isRunning ? s_pauseSim() : s_startSim();
+        }
       } else {
         s_applyPreset(btn.dataset.preset);
         s_startSim();
