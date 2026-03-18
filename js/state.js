@@ -70,6 +70,7 @@ let svHistory1L  = [];     // [{iter, svs}, …]
 // When this is disabled we sample a random A and use Σ_x = AAᵀ ≠ I.
 // The loss becomes ||(W_e2e − W*)A||²_F, and the theory target SVs become
 // SVD(W*A) instead of SVD(W*).  TF.js autograd handles the gradient change.
+let alignedInit        = true;  // toggle: use decoupled/aligned initial conditions
 let inputCovIsIdentity = true;  // toggle: true → Σ_x = I
 let sqrtSigmaX         = null;  // tf.Tensor [inDim, inDim], null when identity
 

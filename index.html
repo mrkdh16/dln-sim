@@ -162,7 +162,7 @@
           <!-- Action buttons -->
           <div class="ctrl-row">
             <button id="start-btn" class="btn btn-primary">start</button>
-            <button id="reset-btn" class="btn btn-link">reset</button>
+            <button id="reset-btn" class="btn">reset</button>
           </div>
 
           <!-- Depth -->
@@ -227,6 +227,13 @@
               </label>
             </div>
 
+            <div class="ctrl-row">
+              <label class="toggle-label">
+                <input type="checkbox" id="aligned-init-toggle" checked>
+                <span>aligned initialization</span>
+              </label>
+            </div>
+
           </div><!-- /more-options-panel -->
 
         </div><!-- /controls-panel -->
@@ -257,7 +264,7 @@
                 <label class="sv-toggle-pill">
                   <input type="checkbox" id="show-deep-toggle" checked>
                   <span class="pill-line pill-solid"></span>
-                  Deep
+                  Empirical
                 </label>
                 <label class="sv-toggle-pill">
                   <input type="checkbox" id="show-theory-toggle" checked>

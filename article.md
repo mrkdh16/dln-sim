@@ -57,7 +57,7 @@ $$Equations (5) and (6) reveal the structure of the learning problem. At a fixed
 1. **Alignment** — rotate the connectivity modes so that distinct modes become orthogonal and cross-mode interference disappears (driving the second term to zero)
 2. **Growth** — scale up the effective mode strengths $\mathbf{a}_{\alpha}\cdot \mathbf{b}_{\alpha}$ toward the target singular values $s_{\alpha}$ (driving the first term to zero)
 
-Empirically and [theoretically](https://arxiv.org/pdf/2111.00034), alignment happens very rapidly at the beginning of training, especially with small initialization (where random high-dimensional vectors are nearly orthogonal by default). Once alignment is achieved, the coupled vector equations collapse into independent scalar equations—one per mode—and we can solve for the full time course of learning. We assume alignment has completed and focus entirely on the growth phase.
+Empirically and [theoretically](https://arxiv.org/pdf/2111.00034), alignment happens very rapidly at the beginning of training, especially with small initialization (where random high-dimensional vectors are nearly orthogonal by default). Once alignment is achieved, the coupled vector equations collapse into independent scalar equations—one per mode—and we can solve for the full time course of learning. We assume alignment has completed and focus entirely on the growth phase. The simulator below lets you toggle this assumption.
 #### Decoupled Scalar Equations
 Once aligned, each pair $(\mathbf{a}_\alpha, \mathbf{b}_\alpha)$ evolves along a shared direction $\mathbf{r}_\alpha$. Write:
 $$
@@ -107,7 +107,7 @@ The structure is recognizably similar: the same $(s_\alpha - \hat{s}_\alpha)$ dr
 ## Key Findings
 #### 1. Ordered learning by singular value strength
 The time for mode $\alpha$ to reach its target strength scales as $O(1/s_\alpha)$. Modes with larger singular values—corresponding to more prominent, statistically dominant structure in the data—are learned first. Subtle distinctions with small $s_\alpha$ take much longer to internalize. This phenomenon, where a network first grasps broad categorical structure before refining fine-grained detail, is observed empirically in nonlinear networks as well.
-#### 2. Sigmoid dynamics are a signature of depth
+#### 2. Sigmoidal dynamics are a signature of depth
 In a shallow (1-layer) linear network, each mode's effective singular value approaches its target _exponentially_: $\hat{s}_\alpha(t) = s_\alpha + (\hat{s}_\alpha^0 - s_\alpha)e^{-2s_\alpha t}$. The logistic S-curve—slow start, rapid transition, plateau—is a direct mathematical consequence of depth. It requires no nonlinear activation functions; depth alone induces this behavior through the coupling of the weight matrices in the product $W_2 W_1$.
 #### 3. Plateaus and sudden transitions are inevitable
 When $s_\alpha \gg \hat{s}_\alpha^0$ (small initialization relative to the signal strength), the sigmoid transition is very sharp. The network spends a long time in a near-flat plateau before rapidly learning the mode. This explains why training loss curves often show long periods of little apparent progress followed by sudden drops. It's an intrinsic mathematical property of gradient descent in deep architectures.

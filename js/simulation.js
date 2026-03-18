@@ -2,12 +2,57 @@
 // GRADIENT DESCENT SIMULATION
 // ============================================================================
 
-const STEPS_PER_FRAME  = 3;  // gradient steps taken each animation frame
+const STEPS_PER_FRAME  = 10; // gradient steps taken each animation frame
 const SV_RECORD_EVERY  = 5;  // record singular values every N iterations
 const STEPS_SEC_WINDOW = 60; // timestamps kept for steps/sec rolling average
 const CHART_UPDATE_MS  = 25; // throttle chart redraws to ~40 fps
 
 let lastChartUpdate = 0;
+
+// ── Aligned (decoupled) initialisation ───────────────────────────────────────
+// Sets W_l = R[l+1] * D_l * R[l]^T where:
+//   R[0]     = V  (right singular vectors of target, full [inDim × inDim])
+//   R[depth] = U  (left  singular vectors of target, full [outDim × outDim])
+//   R[l]     = random orthogonal for intermediate layers
+//   D_l      = initScale * I (pseudo-diagonal [dims[l+1] × dims[l]])
+// This ensures each mode evolves independently (Saxe et al. decoupled manifold).
+
+function initAlignedWeights() {
+  const depth = getDepth();
+
+  // Full SVD of target via numeric.js (needs rows >= cols)
+  let T       = targetMatrix.arraySync();
+  let swapped = false;
+  if (T.length < T[0].length) { T = numeric.transpose(T); swapped = true; }
+  const { U: Usvd, V: Vsvd } = numeric.svd(T);
+  // If swapped: target^T = Usvd * diag(S) * Vsvd^T  =>  target = Vsvd * diag(S) * Usvd^T
+  const U_T = swapped ? Vsvd : Usvd;  // [outDim × outDim]
+  const V_T = swapped ? Usvd : Vsvd;  // [inDim  × inDim]
+
+  // Build orthogonal frame sequence R[0..depth]
+  // R[l] has shape [dims[l] × dims[l]]
+  const R = [V_T];
+  for (let l = 1; l < depth; l++) {
+    const d    = dims[l];
+    const rand = Array.from({ length: d }, () =>
+      Array.from({ length: d }, () => (Math.random() - 0.5) * 2));
+    // U from svd of a random matrix is uniformly distributed on O(d)
+    const { U: Q } = numeric.svd(rand);
+    R.push(Q);
+  }
+  R.push(U_T);
+
+  // Assign W_l = R[l+1] @ D_l @ R[l]^T
+  weightVars.forEach((wv, l) => {
+    const outD = dims[l + 1];
+    const inD  = dims[l];
+    const k    = Math.min(outD, inD);
+    const D    = Array.from({ length: outD }, (_, i) =>
+      Array.from({ length: inD }, (_, j) => (i === j && i < k) ? initScale : 0));
+    const W = numeric.dot(R[l + 1], numeric.dot(D, numeric.transpose(R[l])));
+    wv.assign(tf.tensor2d(W));
+  });
+}
 
 // ── Initialisation ───────────────────────────────────────────────────────────
 
@@ -20,7 +65,7 @@ function initSimulation() {
 
   const depth = getDepth();
 
-  // Create weight variables (small random initialisation)
+  // Create weight variables (small random initialisation — may be overridden below)
   weightVars = [];
   for (let i = 0; i < depth; i++) {
     const [rows, cols] = getWeightShape(i);
@@ -29,10 +74,11 @@ function initSimulation() {
     init.dispose();
   }
 
-  // Diagonal target matrix — singular values are the diagonal entries
+  // Diagonal target matrix — equally spaced singular values in (0, 1]
   const [outDim, inDim] = getE2EShape();
   const n = Math.min(outDim, inDim);
-  const diagVals = tf.abs(tf.randomNormal([n]));
+  const diagArr  = Array.from({ length: n }, (_, i) => (n - i) / n);
+  const diagVals = tf.tensor1d(diagArr);
   targetMatrix = tf.pad(tf.diag(diagVals), [[0, outDim - n], [0, inDim - n]]);
   diagVals.dispose();
 
@@ -41,6 +87,11 @@ function initSimulation() {
   if (!inputCovIsIdentity) {
     sqrtSigmaX = tf.randomNormal([inDim, inDim], 0, 1 / Math.sqrt(inDim));
   }
+
+  // Aligned (decoupled) initialisation: override random weights.
+  // Must happen BEFORE initE2ESVs so the theory curve uses the correct
+  // initial e2e singular values (not the discarded random ones).
+  if (alignedInit) initAlignedWeights();
 
   // Saxe theory only applies to linear networks
   if (activation) {
@@ -116,7 +167,7 @@ function saxeTheoretical(alpha, iters) {
 
   // ── L ≥ 3: numerical integration of the deep ODE (Saxe Eq. 15) ─────────
   //
-  //   du/dk = η · L · u^{2−2/L} · (s − u)
+  //   du/dk = 2η · L · u^{2−2/L} · (s − u)
   //
   // We integrate forward with RK4 from k=0 to max(iters), sampling at each
   // requested iteration.  The step size is 1 (one gradient-descent iteration),
@@ -148,11 +199,13 @@ function _integrateDeepODE(sA, u0A, L, lr, iters) {
     return iters.map(k => cached[Math.min(k, cached.length - 1)]);
   }
 
-  // RHS of the ODE:  du/dk = lr * L * u^{2-2/L} * (s - u)
+  // RHS of the ODE:  du/dk = 2 * lr * L * u^{2-2/L} * (s - u)
+  // Factor of 2 because our loss is ||W_e2e - W*||^2_F (no 1/2),
+  // doubling the gradient vs. the Saxe paper's (1/2)||...||^2_F loss.
   const exponent = 2 - 2 / L;
   function dudk(u) {
     if (u <= 0) return 0;
-    return lr * L * Math.pow(u, exponent) * (sA - u);
+    return 2 * lr * L * Math.pow(u, exponent) * (sA - u);
   }
 
   // Integrate with RK4, step size = 1 iteration

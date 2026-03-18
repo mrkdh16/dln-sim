@@ -715,7 +715,6 @@ html, body {
 }
 .btn-link:hover { background: none; border-color: transparent; color: var(--text-color); text-decoration: underline; }
 
-#reset-btn { border-color: var(--border-color); }
 
 /* ── Controls layout ─────────────────────────────────────────── */
 

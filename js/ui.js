@@ -329,4 +329,10 @@ function setupUIHandlers() {
     inputCovIsIdentity = e.target.checked;
     resetSim();
   });
+
+  // Aligned init toggle
+  document.getElementById('aligned-init-toggle').addEventListener('change', e => {
+    alignedInit = e.target.checked;
+    resetSim();
+  });
 }
