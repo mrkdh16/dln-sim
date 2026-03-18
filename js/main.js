@@ -6,24 +6,26 @@ window.addEventListener('DOMContentLoaded', () => {
   // 1. Size the canvas to fill its container
   resizeCanvas();
 
-  // 2. Create Chart.js chart instances
+  // 2. Create Chart.js chart instances (both full widget and simple widget)
   initCharts();
+  initSimpleCharts();
 
   // 3. Wire up canvas click events (matrix selection)
   setupCanvasEvents();
 
-  // 4. Wire up controls bar (sliders, buttons, config)
+  // 4. Wire up controls bar (sliders, buttons, config, presets)
   setupUIHandlers();
 
   // 5. Wire up panel drag-resize handles
   setupPanelResizers();
 
-  // 6. Init simulation so the canvas shows the network skeleton
-  initSimulation();
+  // 6. Bottom widget: linear depth-2 default (theory curves work), no auto-start
+  applyPresetConfig('depth2');
   draw();
 
-  // 7. Reflect the default selectedMatrixIdx (W_e2e) in the SV panel
-  refreshSVPanel();
+  // 7. Simple widget: auto-start with deep ReLU
+  s_applyPreset('relu_deep');
+  s_startSim();
 });
 
 // ── Panel resizers ────────────────────────────────────────────────────────────

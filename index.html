@@ -24,6 +24,105 @@
     })();
   </script>
 
+
+  <div id="page-title"><h1>Learning Dynamics of Deep Linear Networks</h1></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       SIMPLE WIDGET — preset demo, appears before article text
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="simple-widget-outer">
+    <div id="simple-widget">
+      <div class="simple-widget-columns">
+
+        <!-- Left: linear preset cards -->
+        <div class="preset-col">
+          <div class="preset-col-label">linear</div>
+          <button class="preset-card" data-preset="depth1">
+            <div class="preset-card-header">
+              <span class="preset-card-depth">depth = 1</span>
+              <span class="preset-card-play-icon"><i class="fas fa-play"></i></span>
+            </div>
+            <div class="preset-card-name">Linear Regression</div>
+            <div class="preset-card-desc">exponential loss decay</div>
+          </button>
+          <button class="preset-card" data-preset="depth2">
+            <div class="preset-card-header">
+              <span class="preset-card-depth">depth = 2</span>
+              <span class="preset-card-play-icon"><i class="fas fa-play"></i></span>
+            </div>
+            <div class="preset-card-name">Minimally Deep</div>
+            <div class="preset-card-desc">analytically tractable</div>
+          </button>
+          <button class="preset-card" data-preset="plateau">
+            <div class="preset-card-header">
+              <span class="preset-card-depth">depth = 3</span>
+              <span class="preset-card-play-icon"><i class="fas fa-play"></i></span>
+            </div>
+            <div class="preset-card-name">Deep</div>
+            <div class="preset-card-desc">stepwise decrease in loss</div>
+          </button>
+        </div>
+
+        <!-- Center: charts -->
+        <div class="simple-widget-center">
+          <div class="simple-charts-row">
+            <div class="simple-chart-section" id="simple-loss-section">
+              <div class="simple-chart-title">loss</div>
+              <div class="simple-chart-wrap">
+                <canvas id="simple-loss-chart"></canvas>
+              </div>
+            </div>
+            <div class="simple-chart-section" id="simple-sv-section">
+              <div class="simple-chart-title">singular values of the input-output map</div>
+              <div class="simple-chart-wrap">
+                <canvas id="simple-sv-chart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: nonlinear preset cards -->
+        <div class="preset-col">
+          <div class="preset-col-label">nonlinear</div>
+            <button class="preset-card" data-preset="relu_shallow">
+            <div class="preset-card-header">
+              <span class="preset-card-depth">depth = 2</span>
+              <span class="preset-card-play-icon"><i class="fas fa-play"></i></span>
+            </div>
+            <div class="preset-card-name">Shallow ReLU</div>
+            <div class="preset-card-desc">piecewise linear</div>
+          </button>
+          <button class="preset-card active" data-preset="relu_deep">
+            <div class="preset-card-header">
+              <span class="preset-card-depth">depth = 3</span>
+              <span class="preset-card-play-icon"><i class="fas fa-play"></i></span>
+            </div>
+            <div class="preset-card-name">Deep ReLU</div>
+            <div class="preset-card-desc">piecewise linear</div>
+          </button>
+          <button class="preset-card" data-preset="tanh">
+            <div class="preset-card-header">
+              <span class="preset-card-depth">depth = 3</span>
+              <span class="preset-card-play-icon"><i class="fas fa-play"></i></span>
+            </div>
+            <div class="preset-card-name">Deep tanh</div>
+            <div class="preset-card-desc">smoothly saturating </div>
+          </button>
+        </div>
+      </div>
+      <p id="simple-model-eq" style="text-align:center;">$y = W_3\,\text{ReLU}(W_2\,\text{ReLU}(W_1 x))$</p>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       PAGE INTRO — brief context, shown between widget and full article
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="page-intro">
+    <div class="article-inner" id="page-intro-inner"></div>
+  </div>
+
+
   <!-- ═══════════════════════════════════════════════════════════════════════
        ARTICLE SECTION — content loaded from article.md
        ═══════════════════════════════════════════════════════════════════════ -->
@@ -33,14 +132,13 @@
 
 
   <!-- ═══════════════════════════════════════════════════════════════════════
-       WIDGET SECTION (bordered app window)
+       FULL WIDGET SECTION (bordered app window)
        ═══════════════════════════════════════════════════════════════════════ -->
   <div id="widget-container">
   <div id="widget-section">
     <!-- ── Header ──────────────────────────────────────────────────────── -->
     <div id="header">
       <h1>Deep Linear Network Simulator</h1>
-      <p>Configure the architecture below, start training, and observe singular value dynamics. Click any weight matrix on the canvas to inspect its singular values.</p>
     </div>
 
     <!-- ── Main: left panel + right panel ──────────────────────────────── -->
@@ -64,47 +162,27 @@
           <!-- Action buttons -->
           <div class="ctrl-row">
             <button id="start-btn" class="btn btn-primary">start</button>
-            <button id="reset-btn" class="btn">reset</button>
+            <button id="reset-btn" class="btn btn-link">reset</button>
           </div>
 
-          <!-- Architecture section -->
-          <div class="ctrl-section-label">Architecture</div>
-
-          <div class="ctrl-row">
-            <div class="ctrl-group">
-              <span class="ctrl-label">input dim</span>
-              <input type="number" id="input-dim" value="8" min="1" max="512">
-            </div>
-            <div class="ctrl-group">
-              <span class="ctrl-label">output dim</span>
-              <input type="number" id="output-dim" value="8" min="1" max="512">
-            </div>
+          <!-- Depth -->
+          <div class="ctrl-row" style="margin-top:3px">
             <div class="ctrl-group">
               <span class="ctrl-label">depth</span>
               <input type="number" id="depth-input" value="2" min="1" max="10">
             </div>
           </div>
 
+          <!-- Learning rate -->
           <div class="ctrl-row">
             <div class="ctrl-group ctrl-grow">
-              <span class="ctrl-label">hidden dim</span>
-              <input type="range" id="hidden-dim-slider" class="slider slider-wide" min="0" max="100" value="32">
-              <span id="hidden-dim-display" class="ctrl-val">—</span>
-            </div>
-            <button id="apply-btn" class="btn btn-sm">apply</button>
-          </div>
-
-          <!-- Training hyperparameters section -->
-          <div class="ctrl-section-label">Hyperparameters</div>
-
-          <div class="ctrl-row">
-            <div class="ctrl-group ctrl-grow">
-              <span class="ctrl-label">learning rate</span>
+              <span class="ctrl-label">lr</span>
               <input type="range" id="lr-slider" class="slider slider-wide" min="0" max="100" value="36">
               <span id="lr-display" class="ctrl-val">—</span>
             </div>
           </div>
 
+          <!-- Init scale -->
           <div class="ctrl-row">
             <div class="ctrl-group ctrl-grow">
               <span class="ctrl-label">init scale</span>
@@ -113,30 +191,43 @@
             </div>
           </div>
 
-          <div class="ctrl-row">
-            <label class="toggle-label">
-              <input type="checkbox" id="isotropic-toggle" checked>
-              <p>Whiten uncentered covariance matrix of input ($\Sigma_{xx}=I$; necessary assumption for Saxe et al. theory)</p>
-            </label>
+          <!-- More options toggle -->
+          <div class="ctrl-row" style="margin-top:4px">
+            <button id="more-options-btn" class="btn btn-sm">+ more hyperparameters</button>
           </div>
 
-          <!-- Metrics section -->
-          <!-- <div class="ctrl-section-label">Metrics</div>
+          <!-- More options (hidden by default) -->
+          <div id="more-options-panel" style="display:none">
 
-          <div class="metric-group">
-            <div class="metric-item">
-              <span class="metric-label">loss</span>
-              <span id="loss-display" class="metric-val">—</span>
+            <div class="ctrl-section-label">Architecture</div>
+
+            <div class="ctrl-row">
+              <div class="ctrl-group">
+                <span class="ctrl-label">input</span>
+                <input type="number" id="input-dim" value="6" min="1" max="512">
+              </div>
+              <div class="ctrl-group">
+                <span class="ctrl-label">output</span>
+                <input type="number" id="output-dim" value="6" min="1" max="512">
+              </div>
             </div>
-            <div class="metric-item">
-              <span class="metric-label">step</span>
-              <span id="iter-display" class="metric-val">—</span>
+
+            <div class="ctrl-row">
+              <div class="ctrl-group ctrl-grow">
+                <span class="ctrl-label">hidden</span>
+                <input type="range" id="hidden-dim-slider" class="slider slider-wide" min="0" max="100" value="32">
+                <span id="hidden-dim-display" class="ctrl-val">—</span>
+              </div>
             </div>
-            <div class="metric-item">
-              <span class="metric-label">steps/s</span>
-              <span id="steprate-display" class="metric-val">—</span>
+
+            <div class="ctrl-row">
+              <label class="toggle-label">
+                <input type="checkbox" id="isotropic-toggle" checked>
+                <span>whitened inputs ($\Sigma_{xx}=I$)</span>
+              </label>
             </div>
-          </div> -->
+
+          </div><!-- /more-options-panel -->
 
         </div><!-- /controls-panel -->
       </div><!-- /left-panel -->
@@ -173,11 +264,6 @@
                   <span class="pill-line pill-dotted"></span>
                   Theory
                 </label>
-                <label class="sv-toggle-pill">
-                  <input type="checkbox" id="show-shallow-toggle">
-                  <span class="pill-line pill-dashed"></span>
-                  Shallow
-                </label>
               </div>
             </div>
 
@@ -187,17 +273,13 @@
               <canvas id="sv-chart"></canvas>
             </div>
 
-            <!-- Theory formula — shown only for e2e selection with depth=2 -->
+            
             <div id="theory-row" class="theory-row" style="display:none">
             <p id="theory-formula-L2" class="hint" style="margin-top:5px">
-                Saxe et al. Eq.&nbsp;12 for $L=2$: $\hat{s}_\alpha(k) = \dfrac{s_\alpha}{1 + \left(\frac{s_\alpha}{\hat{s}_\alpha^0} - 1\right)e^{-2s_\alpha \eta k}}$.
-                When $\Sigma_{xx} \neq I$, $s_\alpha$ and $\hat{s}_\alpha$ are singular values of $W^* A$ and $W_{\text{total}} A$.
+                Theory curves from Eq. (10)
             </p>
             <p id="theory-formula-deep" class="hint" style="margin-top:5px">
-                Numerical integration of Saxe et al. Eq.&nbsp;15: $\;\dfrac{du_\alpha}{dk} = \eta \, L \, u_\alpha^{\,2-2/L}(s_\alpha - u_\alpha)$,
-                where $L$ is the number of weight matrices.
-                Exact on the balanced, decoupled invariant manifold ($a_i = u^{1/L}$); approximate from random init.
-                When $\Sigma_{xx} \neq I$, $s_\alpha$ and $u_\alpha$ are singular values of $W^* A$ and $W_{\text{total}} A$.
+                Theory curves from numerically integrating Eq. (11)
             </p>
             </div>
 
@@ -226,6 +308,7 @@
   <script src="js/drawing.js"></script>
   <script src="js/charts.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/simple_sim.js"></script>
   <script src="js/main.js"></script>
 
   <!-- Theme toggle -->
@@ -256,8 +339,10 @@
       throwOnError: false
     };
 
-    // Render widget math (static HTML present at load time)
+    // Render math in static sections (present at load time)
+    renderMathInElement(document.getElementById('simple-widget-outer'), KATEX_OPTS);
     renderMathInElement(document.getElementById('widget-section'), KATEX_OPTS);
+    renderMathInElement(document.getElementById('page-intro'), KATEX_OPTS);
 
     // Protect math delimiters from Markdown parser, restore after parse.
     function renderMarkdown(md) {
@@ -269,6 +354,18 @@
       html = html.replace(/\x00M(\d+)\x00/g, (_, i) => saved[+i]);
       return html;
     }
+
+    fetch('intro.md')
+      .then(r => r.text())
+      .then(md => {
+        document.getElementById('page-intro-inner').innerHTML = renderMarkdown(md);
+        renderMathInElement(document.getElementById('page-intro'), KATEX_OPTS);
+      })
+      .catch(e => {
+        document.getElementById('page-intro-inner').innerHTML =
+          '<p style="color:red;padding:20px">Intro render error: ' + e.message + '</p>';
+        console.error('Intro render error:', e);
+      });
 
     fetch('article.md')
       .then(r => r.text())

@@ -16,7 +16,7 @@
 // ============================================================================
 
 // Network dimensions (mutable when user applies a new config)
-let dims = [8, 8, 8]; // default: depth=2, all dims=4
+let dims = [6, 6, 6]; // default: depth=2, all dims=6 (matches depth2 preset)
 
 // TF.js trainable variables — one per weight matrix
 // weightVars[i].shape = [dims[i+1], dims[i]]
@@ -39,13 +39,16 @@ let iterationCount = 0;
 let animFrameId   = null;
 let stepTimestamps = []; // rolling window for steps/sec
 
-// Hyperparameters
+// Hyperparameters (match depth2 preset defaults)
 let learningRate = 0.005;
 let initScale    = 0.01;
 
+// Activation function key for nonlinear presets: null = linear, 'relu'/'tanh'/'sigmoid'
+let activation = null;
+
 // UI — which matrix is currently selected on the canvas
 // null = none, 0…depth-1 = weight matrix W_{i+1}, depth = e2e product
-let selectedMatrixIdx = 2; // default: W_e2e (depth=2 for dims=[8,8,8])
+let selectedMatrixIdx = 2; // default: W_e2e (depth=2 for dims=[6,6,6])
 
 // ── Saxe et al. theoretical comparison ──────────────────────────────────────
 // Singular values of the target matrix W* (computed at init, descending order)
@@ -55,7 +58,6 @@ let initE2ESVs = [];
 // SV chart curve-group visibility (controlled by toggle pills)
 let showDeep    = true;   // empirical deep network curves
 let showTheory  = true;   // Saxe et al. theoretical overlay
-let showShallow = false;  // depth-1 comparison curves
 
 // ── Depth-1 (shallow) comparison network ─────────────────────────────────────
 // A single-layer network trained in parallel so users can compare dynamics.

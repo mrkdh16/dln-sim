@@ -29,9 +29,12 @@ function initSimulation() {
     init.dispose();
   }
 
-  // Create random target matrix (standard normal)
+  // Diagonal target matrix — singular values are the diagonal entries
   const [outDim, inDim] = getE2EShape();
-  targetMatrix = tf.randomNormal([outDim, inDim]);
+  const n = Math.min(outDim, inDim);
+  const diagVals = tf.abs(tf.randomNormal([n]));
+  targetMatrix = tf.pad(tf.diag(diagVals), [[0, outDim - n], [0, inDim - n]]);
+  diagVals.dispose();
 
   // Input covariance: A ∈ ℝ^{inDim×inDim}, Σ_x = AAᵀ, scaled so E[Σ_x] = I.
   // null when the isotropic assumption (Σ_x = I) is active.
@@ -39,17 +42,20 @@ function initSimulation() {
     sqrtSigmaX = tf.randomNormal([inDim, inDim], 0, 1 / Math.sqrt(inDim));
   }
 
-  // Target SVs for Saxe theory: SVD(W*A) when Σ_x ≠ I, SVD(W*) otherwise.
-  targetSVs = sqrtSigmaX
-    ? tf.tidy(() => computeSVs(tf.matMul(targetMatrix, sqrtSigmaX)))
-    : computeSVs(targetMatrix);
-
-  // Initial effective e2e SVs u_α(0)
-  initE2ESVs = tf.tidy(() => {
-    const e2e = computeE2E();
-    if (sqrtSigmaX) return computeSVs(tf.matMul(e2e, sqrtSigmaX));
-    return computeSVs(e2e);
-  });
+  // Saxe theory only applies to linear networks
+  if (activation) {
+    targetSVs  = [];
+    initE2ESVs = [];
+  } else {
+    targetSVs = sqrtSigmaX
+      ? tf.tidy(() => computeSVs(tf.matMul(targetMatrix, sqrtSigmaX)))
+      : computeSVs(targetMatrix);
+    initE2ESVs = tf.tidy(() => {
+      const e2e = computeE2E();
+      if (sqrtSigmaX) return computeSVs(tf.matMul(e2e, sqrtSigmaX));
+      return computeSVs(e2e);
+    });
+  }
 
   // Depth-1 comparison network: single weight matrix, same target + hypers
   const init1L = tf.randomNormal([outDim, inDim], 0, initScale);
@@ -182,7 +188,22 @@ function computeE2E() {
   for (let i = 1; i < weightVars.length; i++) {
     product = tf.matMul(weightVars[i], product);
   }
-  return product; // chain of matMuls, intermediate tensors tracked by tidy
+  return product;
+}
+
+// Forward pass: linear → computeE2E(); nonlinear → W_L σ(… σ(W_1)) with X = I
+function computeForward() {
+  if (!activation) return computeE2E();
+  const act = activation === 'relu'    ? tf.relu
+            : activation === 'tanh'    ? tf.tanh
+            : activation === 'sigmoid' ? tf.sigmoid : null;
+  if (!act) return computeE2E();
+  let h = weightVars[0];
+  for (let i = 1; i < weightVars.length; i++) {
+    h = act(h);
+    h = tf.matMul(weightVars[i], h);
+  }
+  return h; // = W_L σ(W_{L-1} … σ(W_1))
 }
 
 // ── Single gradient step ─────────────────────────────────────────────────────
@@ -210,7 +231,7 @@ function gradientStep() {
   // are automatically freed.  Variable tensors are never disposed by tidy.
   tf.tidy(() => {
     const result = tf.variableGrads(() => {
-      return lossFromDiff(tf.sub(computeE2E(), targetMatrix));
+      return lossFromDiff(tf.sub(computeForward(), targetMatrix));
     });
 
     // Gradient descent: w ← w − lr · ∇w
@@ -225,7 +246,7 @@ function gradientStep() {
 
 function getCurrentLoss() {
   return tf.tidy(() => {
-    return lossFromDiff(tf.sub(computeE2E(), targetMatrix)).dataSync()[0];
+    return lossFromDiff(tf.sub(computeForward(), targetMatrix)).dataSync()[0];
   });
 }
 
@@ -251,12 +272,11 @@ function recordSVs() {
     svHistories[i].push({ iter: iterationCount, svs });
   }
 
-  // Singular values of the end-to-end product (projected through Σ_x^{1/2}
-  // when the isotropic assumption is off, to match the theory's basis).
+  // Singular values of the output mapping (e2e for linear, forward pass for nonlinear)
   const e2eSVs = tf.tidy(() => {
-    const e2e = computeE2E();
-    if (sqrtSigmaX) return computeSVs(tf.matMul(e2e, sqrtSigmaX));
-    return computeSVs(e2e);
+    const out = computeForward();
+    if (sqrtSigmaX) return computeSVs(tf.matMul(out, sqrtSigmaX));
+    return computeSVs(out);
   });
   svHistories[depth].push({ iter: iterationCount, svs: e2eSVs });
 
@@ -300,6 +320,7 @@ function simulationLoop() {
   if (now - lastChartUpdate >= CHART_UPDATE_MS) {
     updateLossChart();
     if (selectedMatrixIdx !== null) updateSVChart();
+    updateSimpleCharts();
     lastChartUpdate = now;
   }
 
@@ -309,6 +330,16 @@ function simulationLoop() {
 }
 
 // ── Public controls ───────────────────────────────────────────────────────────
+
+function updateCardPlayIcon(playing) {
+  document.querySelectorAll('.preset-card .preset-card-play-icon i')
+    .forEach(i => { i.className = 'fas fa-play'; });
+  if (!playing) return;
+  const activeCard = document.querySelector('.preset-card.active');
+  if (!activeCard) return;
+  const icon = activeCard.querySelector('.preset-card-play-icon i');
+  if (icon) icon.className = 'fas fa-pause';
+}
 
 function startSim() {
   if (isRunning) return;

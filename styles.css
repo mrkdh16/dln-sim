@@ -37,7 +37,7 @@ html { scroll-behavior: smooth; }
 
 html, body {
   font-family: 'et-book', 'ETBookOT', 'ET Book', Georgia, 'Times New Roman', serif;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.7;
   color: var(--text-color);
   background: var(--bg-color);
@@ -62,6 +62,207 @@ html, body {
 }
 .theme-toggle:hover { color: var(--link-hover); }
 
+#page-title {
+  padding: 0.9em 3em 0;
+  background: var(--code-bg);
+  text-align: center;
+}
+#page-title h1 {
+  max-width: 90%;
+  margin: 0 auto;
+  font-size: 1.5em;
+  font-weight: 700;
+  color: var(--heading-color);
+}
+
+/* ════════════════════════════════════════════════════════════
+   SIMPLE WIDGET — preset demo at top of page
+   ════════════════════════════════════════════════════════════ */
+
+#simple-widget-outer {
+  background: var(--code-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 2.5em 3em;
+  height: 48vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#simple-widget {
+  width: 80%;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── 3-column layout: linear | eq+charts | nonlinear ── */
+
+.simple-widget-columns {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.preset-col {
+  flex: 0 0 clamp(140px, 13%, 200px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preset-col-label {
+  font-size: 0.68em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--meta-color);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.preset-col .preset-card {
+  flex: 1;
+  justify-content: center;
+}
+
+.simple-widget-center {
+  flex: 1;
+  min-width: 0;
+}
+
+.preset-card {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  background: var(--bg-color);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s, background 0.15s;
+}
+.preset-card:hover {
+  border-color: var(--text-color);
+}
+.preset-card.active {
+  border-color: var(--heading-color);
+  background: var(--code-bg);
+}
+.preset-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+.preset-card-depth {
+  font-size: 0.72em;
+  color: var(--meta-color);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.preset-card-play-icon {
+  font-size: 0.65em;
+  color: var(--border-color);
+  transition: color 0.15s;
+}
+.preset-card:hover .preset-card-play-icon {
+  color: var(--meta-color);
+}
+.preset-card.active .preset-card-play-icon {
+  color: var(--heading-color);
+}
+.preset-card-name {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--heading-color);
+  margin-bottom: 4px;
+}
+.preset-card-desc {
+  font-size: 0.76em;
+  color: var(--meta-color);
+  line-height: 1.35;
+}
+
+
+/* ── Charts ── */
+
+.simple-charts-row {
+  display: flex;
+  gap: 16px;
+  height: clamp(180px, 28vh, 280px);
+  flex-shrink: 0;
+}
+
+.simple-chart-section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Loss chart: aspect-ratio keeps it square at any height */
+#simple-loss-section { flex: 0 0 auto; aspect-ratio: 1; }
+#simple-sv-section   { flex: 1;}
+
+.simple-chart-title {
+  font-size: 0.75em;
+  color: var(--meta-color);
+  font-style: italic;
+  margin-bottom: 5px;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.sv-legend-hint {
+  opacity: 0.8;
+}
+
+.simple-chart-wrap {
+  flex: 1;
+  position: relative;
+  border: 1px solid var(--border-color);
+  background: var(--bg-color);
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (max-width: 700px) {
+  #simple-widget-outer { height: auto; padding: 1.5em; }
+  .simple-widget-columns { flex-direction: column; }
+  .preset-col { flex: 0 0 auto; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .preset-col .preset-card { flex: 1 1 calc(33% - 6px); }
+  .simple-charts-row { flex-direction: column; }
+  #simple-loss-section { flex: 0 0 auto; aspect-ratio: auto; height: 160px; }
+  #simple-sv-section   { flex: 0 0 auto; height: 220px; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   PAGE INTRO — brief context between widget and article
+   ════════════════════════════════════════════════════════════ */
+
+#page-intro {
+  /* background: var(--bg-color);
+  border-bottom: 1px solid var(--border-color); */
+  padding: 2.2em 2em 1em;
+}
+
+#page-intro .article-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+#page-intro p {
+  font-size: 1em;
+  line-height: 1.7;
+  color: var(--text-color);
+  margin-bottom: 1em;
+}
+#page-intro p:last-child { margin-bottom: 0; }
+
 /* ════════════════════════════════════════════════════════════
    ARTICLE SECTION
    ════════════════════════════════════════════════════════════ */
@@ -69,7 +270,7 @@ html, body {
 #article {
   background: var(--bg-color);
   border-bottom: 1px solid var(--border-color);
-  padding: 3em 2em;
+  /* padding: 0em 10em; */
 }
 
 .article-inner {
@@ -205,6 +406,7 @@ html, body {
 .scroll-prompt {
   text-align: center;
   margin-top: 3em;
+  margin-bottom: 2em;
   color: var(--meta-color);
 }
 .scroll-prompt-line {
@@ -504,6 +706,17 @@ html, body {
 
 .btn-sm { font-size: 0.8em; padding: 3px 8px; }
 
+.btn-link {
+  background: none;
+  border-color: transparent;
+  color: var(--meta-color);
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.btn-link:hover { background: none; border-color: transparent; color: var(--text-color); text-decoration: underline; }
+
+#reset-btn { border-color: var(--border-color); }
+
 /* ── Controls layout ─────────────────────────────────────────── */
 
 .ctrl-row {
@@ -617,9 +830,17 @@ body.resizing-v { user-select: none; cursor: row-resize; }
    RESPONSIVE
    ════════════════════════════════════════════════════════════ */
 
+/* More-options panel border */
+#more-options-panel {
+  border-top: 1px solid var(--border-color);
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
 @media (max-width: 768px) {
-  html, body { font-size: 16px; }
+  html, body { font-size: 17px; }
   #article    { padding: 2em 1em; }
+  #simple-widget-outer { padding: 1.2em 1em 1em; }
   #widget-container { padding: 0.75em; }
   .theme-toggle { top: 1.2em; right: 1em; }
 }
