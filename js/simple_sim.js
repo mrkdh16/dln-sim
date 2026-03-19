@@ -15,10 +15,13 @@ let s_activation   = null;
 let s_learningRate = 0.01;
 let s_initScale    = 0.01;
 
-let s_weightVars   = [];
-let s_targetMatrix = null;
-let s_inputData    = null;  // fixed random inputs X,    shape [d_in,  S_NUM_DATA]
-let s_targetData   = null;  // targets Y = W* X,         shape [d_out, S_NUM_DATA]
+let s_weightVars       = [];
+let s_targetMatrix     = null;
+let s_inputData        = null;  // fixed random inputs X,    shape [d_in,  S_NUM_DATA]
+let s_targetData       = null;  // targets Y,                shape [d_out, S_NUM_DATA]
+let s_projMatrix       = null;  // p × d_in projection U for nonlinear targets
+let s_targetActivation = null;  // elementwise g in y = g(Ux); null → linear y = W*x
+let s_projDim          = null;  // p (output dim of U)
 
 let s_lossHistory  = [];
 let s_svHistories  = [];   // s_svHistories[s_getDepth()] = e2e SVs
@@ -40,9 +43,10 @@ function s_getE2EShape()     { return [s_dims[s_dims.length - 1], s_dims[0]]; }
 
 function s_initSim() {
   s_weightVars.forEach(v => { try { v.dispose(); } catch (_) {} });
-  if (s_targetMatrix) { try { s_targetMatrix.dispose(); } catch (_) {} }
-  if (s_inputData)    { try { s_inputData.dispose();    } catch (_) {} }
-  if (s_targetData)   { try { s_targetData.dispose();   } catch (_) {} }
+  if (s_targetMatrix) { try { s_targetMatrix.dispose(); } catch (_) {} s_targetMatrix = null; }
+  if (s_projMatrix)   { try { s_projMatrix.dispose();   } catch (_) {} s_projMatrix   = null; }
+  if (s_inputData)    { try { s_inputData.dispose();    } catch (_) {} s_inputData    = null; }
+  if (s_targetData)   { try { s_targetData.dispose();   } catch (_) {} s_targetData   = null; }
 
   const depth = s_getDepth();
   s_weightVars = [];
@@ -61,11 +65,20 @@ function s_initSim() {
   s_targetMatrix = tf.pad(tf.diag(diagVals), [[0, outDim - n], [0, inDim - n]]);
   diagVals.dispose();
 
-  // Fixed random dataset: x^μ ~ N(0, I), y^μ = W* x^μ
-  // Inputs drawn iid N(0,1) so E[X Xᵀ / P] = I (whitened), keeping the
-  // input-output correlation matrix f(X) Xᵀ / P in the same scale as W*.
-  s_inputData  = tf.randomNormal([inDim, S_NUM_DATA]);
-  s_targetData = tf.matMul(s_targetMatrix, s_inputData);
+  // Fixed random dataset: x^μ ~ N(0, I)
+  s_inputData = tf.randomNormal([inDim, S_NUM_DATA]);
+
+  // Targets: y^μ = g(U x^μ) for nonlinear presets, or y^μ = W* x^μ for linear
+  if (s_targetActivation && s_projDim) {
+    const act = s_targetActivation === 'relu'    ? tf.relu
+              : s_targetActivation === 'tanh'    ? tf.tanh
+              : s_targetActivation === 'sigmoid' ? tf.sigmoid
+              : s_targetActivation === 'sine'    ? tf.sin : tf.relu;
+    s_projMatrix = tf.randomNormal([s_projDim, inDim]);
+    s_targetData = act(tf.matMul(s_projMatrix, s_inputData));
+  } else {
+    s_targetData = tf.matMul(s_targetMatrix, s_inputData);
+  }
 
   s_lossHistory = [];
   s_svHistories = Array.from({ length: depth + 1 }, () => []);
@@ -89,7 +102,8 @@ function s_computeForwardOn(X) {
   }
   const act = s_activation === 'relu'    ? tf.relu
             : s_activation === 'tanh'    ? tf.tanh
-            : s_activation === 'sigmoid' ? tf.sigmoid : null;
+            : s_activation === 'sigmoid' ? tf.sigmoid
+            : s_activation === 'sin'    ? tf.sin : null;
   let h = tf.matMul(s_weightVars[0], X);
   for (let i = 1; i < s_weightVars.length; i++) {
     h = act(h);
@@ -213,31 +227,23 @@ function s_resetSim() {
 
 // ── Apply preset ──────────────────────────────────────────────────────────────
 
-function s_updateParamsDisplay() {
-  const el = document.getElementById('simple-params');
-  if (!el) return;
-  const depth = s_getDepth();
-  const width = depth > 1 ? s_dims[1] : s_dims[0];
-  const lr    = s_learningRate % 1 === 0 ? s_learningRate : s_learningRate.toPrecision(2);
-  const scale = s_initScale    % 1 === 0 ? s_initScale    : s_initScale.toPrecision(2);
-  el.textContent = `lr = ${lr}  ·  width = ${width}  ·  init ~ N(0, ${scale})`;
-}
-
 function s_applyPreset(key) {
   const p = PRESETS[key];
   if (!p) return;
 
-  s_dims         = p.dims.slice();
-  s_learningRate = p.learningRate;
-  s_initScale    = p.initScale;
-  s_activation   = p.activation || null;
+  s_dims             = p.dims.slice();
+  s_learningRate     = p.learningRate;
+  s_initScale        = p.initScale;
+  s_activation       = p.activation       || null;
+  s_targetActivation = p.targetActivation || null;
+  s_projDim          = p.projDim          || null;
 
   updateEquation(key);
-  s_updateParamsDisplay();
 
   document.querySelectorAll('.preset-card').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.preset === key);
   });
 
   s_resetSim();
+  if (typeof updateSimpleTabs !== 'undefined') updateSimpleTabs();
 }

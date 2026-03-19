@@ -45,6 +45,13 @@ function fmtScientific(v) {
 
 let hiddenDimVal = 6;
 
+// ── Nonlinear target config ───────────────────────────────────────────────────
+// For nonlinear-activation presets, targets are y^μ = g(U x^μ) where
+// U is a random S_TARGET_PROJ_DIM × d_in projection matrix.
+// Change these two constants to experiment with different target functions.
+const S_TARGET_NONLINEARITY = 'sin'; // options: 'relu', 'tanh', 'sigmoid', 'sine'
+const S_TARGET_PROJ_DIM     = 4;      // projection dim p (must be < input dim 6)
+
 // ── Presets ───────────────────────────────────────────────────────────────────
 
 const PRESETS = {
@@ -66,33 +73,41 @@ const PRESETS = {
     initScale: 0.01,
     inputCovIsIdentity: true,
   },
-   'relu_shallow': {
-    dims: [6, 6, 6],
+  'relu_shallow': {
+    dims: [6, 6, S_TARGET_PROJ_DIM],
     learningRate: 0.005,
     initScale: 0.01,
     inputCovIsIdentity: true,
     activation: 'relu',
+    targetActivation: S_TARGET_NONLINEARITY,
+    projDim: S_TARGET_PROJ_DIM,
   },
   'relu_deep': {
-    dims: [6, 6, 6, 6],
+    dims: [6, 6, 6, S_TARGET_PROJ_DIM],
     learningRate: 0.005,
     initScale: 0.01,
     inputCovIsIdentity: true,
     activation: 'relu',
+    targetActivation: S_TARGET_NONLINEARITY,
+    projDim: S_TARGET_PROJ_DIM,
   },
   'tanh': {
-    dims: [6, 6, 6, 6],
+    dims: [6, 6, 6, S_TARGET_PROJ_DIM],
     learningRate: 0.005,
     initScale: 0.01,
     inputCovIsIdentity: true,
     activation: 'tanh',
+    targetActivation: S_TARGET_NONLINEARITY,
+    projDim: S_TARGET_PROJ_DIM,
   },
   'sigmoid': {
-    dims: [6, 6, 6, 6],
+    dims: [6, 6, 6, S_TARGET_PROJ_DIM],
     learningRate: 0.005,
     initScale: 0.01,
     inputCovIsIdentity: true,
     activation: 'sigmoid',
+    targetActivation: S_TARGET_NONLINEARITY,
+    projDim: S_TARGET_PROJ_DIM,
   },
 };
 
@@ -102,15 +117,15 @@ function updateEquation(key) {
   const el = document.getElementById('simple-model-eq');
   if (!el) return;
   const eqs = {
-    depth1:  '$y = W_1 x$',
-    depth2:  '$y = W_2 W_1 x = W_{\\text{total}} x$',
-    plateau: '$y = W_3 W_2 W_1 x = W_{\\text{total}} x$',
-    relu_shallow:    '$y = W_2\\,\\text{ReLU}(W_1 x)$',
-    relu_deep:    '$y = W_3\\,\\text{ReLU}(W_2\\,\\text{ReLU}(W_1 x))$',
-    tanh:    '$y = W_3\\,\\tanh(W_2\\,\\tanh(W_1 x))$',
-    sigmoid: '$y = W_3\\,\\sigma(W_2\\,\\sigma(W_1 x))$',
+    depth1:  '$\\hat{f}(x) = W_1 x$',
+    depth2:  '$\\hat{f}(x) = W_2 W_1 x = W_{\\text{total}} x$',
+    plateau: '$\\hat{f}(x) = W_3 W_2 W_1 x = W_{\\text{total}} x$',
+    relu_shallow: '$\\hat{f}(x) = W_2\\,\\text{ReLU}(W_1 x)$',
+    relu_deep:    '$\\hat{f}(x) = W_3\\,\\text{ReLU}(W_2\\,\\text{ReLU}(W_1 x))$',
+    tanh:    '$\\hat{f}(x) = W_3\\,\\tanh(W_2\\,\\tanh(W_1 x))$',
+    sigmoid: '$\\hat{f}(x) = W_3\\,\\sigma(W_2\\,\\sigma(W_1 x))$',
   };
-  el.textContent = eqs[key] || '$y = W_L \\cdots W_1 x$';
+  el.textContent = eqs[key] || '$\\hat{f}(x) = W_L \\cdots W_1 x$';
   if (typeof renderMathInElement !== 'undefined') {
     renderMathInElement(el, KATEX_OPTS);
   }
@@ -349,4 +364,6 @@ function setupUIHandlers() {
     alignedInit = e.target.checked;
     resetSim();
   });
+
+  initSimpleTabs();
 }

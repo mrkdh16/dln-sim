@@ -81,8 +81,7 @@ html, body {
 
 #simple-widget-outer {
   background: var(--code-bg);
-  border-bottom: 1px solid var(--border-color);
-  padding: 2.5em 3em;
+  padding: 2em 3em 0.6em;
   height: 48vh;
   box-sizing: border-box;
   display: flex;
@@ -217,9 +216,16 @@ html, body {
   min-width: 0;
 }
 
-/* Loss chart: aspect-ratio keeps it square at any height */
-#simple-loss-section { flex: 0 0 auto; aspect-ratio: 1; }
-#simple-sv-section   { flex: 1;}
+#simple-loss-section { flex: 1; }
+#simple-sv-section   { flex: 2; }
+
+#simple-model-eq {
+  width: fit-content;
+  margin: 6px auto 0;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  padding: 3px 12px;
+}
 
 .simple-chart-title {
   font-size: 0.75em;
@@ -230,43 +236,21 @@ html, body {
   line-height: 1.4;
 }
 
-/* ── Tooltip term (dotted underline + popup) ─────────────────────────── */
-.tooltip-term {
-  position: relative;
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
-  cursor: help;
-  white-space: nowrap;
-}
-.tooltip-content {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: 260px;
-  padding: 7px 10px;
-  background: var(--heading-color);
-  color: var(--bg-color);
+/* Asterisk link in SV chart title */
+.sv-iomap-asterisk {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 1px;
+  font-family: inherit;
   font-size: 0.85em;
-  font-style: normal;
-  line-height: 1.45;
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 100;
-  white-space: normal;
+  vertical-align: super;
+  color: var(--meta-color);
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.15s;
 }
-.tooltip-term:hover .tooltip-content { display: block; }
-
-/* ── Simple widget parameter block ──────────────────────────────────── */
-.simple-params {
-  font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
-  font-size: 0.72em;
-  color: var(--border-color);
-  text-align: center;
-  margin-top: 6px;
-  letter-spacing: 0.02em;
-}
+.sv-iomap-asterisk:hover { color: var(--text-color); }
 
 .sv-legend-hint {
   opacity: 0.8;
@@ -289,6 +273,112 @@ html, body {
   .simple-charts-row { flex-direction: column; }
   #simple-loss-section { flex: 0 0 auto; aspect-ratio: auto; height: 160px; }
   #simple-sv-section   { flex: 0 0 auto; height: 220px; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   DETAIL TABS — below simple widget
+   ════════════════════════════════════════════════════════════ */
+
+#stabs-outer {
+  background: var(--code-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 3em 1.8em;
+}
+
+#stabs {
+  width: 80%;
+  margin: 0 auto;
+  padding-top: 0.4em;
+  text-align: center;
+}
+
+
+/* Bracket-style tab bar */
+#stab-bar {
+  display: inline-flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+#stab-bar [role="tab"] {
+  padding: 0;
+  font-size: 0.68em;
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: var(--meta-color);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.5;
+  transition: color 0.12s;
+}
+#stab-bar [role="tab"]:hover { color: var(--text-color); }
+
+#stab-bar [role="tab"][aria-selected="true"] {
+  color: var(--text-color);
+}
+#stab-bar [role="tab"][aria-selected="true"] .stab-label {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--text-color);
+}
+#stab-bar [role="tab"]:focus-visible {
+  outline: 1px dotted var(--meta-color);
+  outline-offset: 2px;
+}
+
+/* Tab panels */
+.stab-panel { display: none; transition: opacity 0.15s ease; }
+.stab-panel.active { display: block; }
+
+.stab-content {
+  font-size: 0.78em;
+  line-height: 1.65;
+  color: var(--text-color);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  text-align: left;
+}
+.stab-content p {
+  margin: 0 0 0.65em;
+}
+.stab-content p:last-child { margin-bottom: 0; }
+
+.stab-note {
+  color: var(--meta-color);
+  font-style: italic;
+}
+
+/* Hyperparams key-value grid */
+.stab-kv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 2em;
+  row-gap: 4px;
+  margin: 0 auto;
+  width: fit-content;
+  text-align: left;
+}
+@media (max-width: 700px) {
+  .stab-kv-grid { grid-template-columns: 1fr; }
+}
+
+.stab-kv-pair {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.stab-kv-key {
+  color: var(--meta-color);
+  font-style: italic;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 9em;
+}
+.stab-kv-val {
+  font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
+  font-size: 0.92em;
+  color: var(--text-color);
 }
 
 /* ════════════════════════════════════════════════════════════

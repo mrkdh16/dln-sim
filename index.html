@@ -76,15 +76,12 @@
               </div>
             </div>
             <div class="simple-chart-section" id="simple-sv-section">
-              <div class="simple-chart-title">singular values of the
-                <span class="tooltip-term">input-output map<span class="tooltip-content">Cross-correlation f(X)X&#7488;/P between network outputs and whitened random inputs X. For a linear network this equals the end-to-end product W&#8343;···W&#8321;. For a nonlinear network it captures the linear component of the learned map.</span></span>
-              </div>
+              <div class="simple-chart-title">singular values of the input-output map<button class="sv-iomap-asterisk" onclick="openIomapTab()" aria-label="About the input-output map">*</button></div>
               <div class="simple-chart-wrap">
                 <canvas id="simple-sv-chart"></canvas>
               </div>
             </div>
           </div>
-          <div class="simple-params" id="simple-params"></div>
         </div>
 
         <!-- Right: nonlinear preset cards -->
@@ -114,12 +111,41 @@
               <span class="preset-card-play-icon"><i class="fas fa-play"></i></span>
             </div>
             <div class="preset-card-name">Deep tanh</div>
-            <div class="preset-card-desc">smoothly saturating </div>
+            <div class="preset-card-desc">smoothly saturating</div>
             <span class="preset-card-reset"><i class="fas fa-rotate-left"></i></span>
           </button>
         </div>
       </div>
-      <p id="simple-model-eq" style="text-align:center;">$y = W_3\,\text{ReLU}(W_2\,\text{ReLU}(W_1 x))$</p>
+      <p id="simple-model-eq">$\hat{y} = W_3\,\text{ReLU}(W_2\,\text{ReLU}(W_1 x))$</p>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       DETAIL TABS — below simple widget, above intro
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="stabs-outer">
+    <div id="stabs">
+
+      <div id="stab-bar" role="tablist" aria-label="Simulation details">
+        <button role="tab" data-tab="hyperparams" id="stab-btn-hyperparams"
+                aria-selected="false" aria-controls="stab-panel-hyperparams" tabindex="0">[<span class="stab-label">hyperparameters</span>]</button>
+        <button role="tab" data-tab="iomap" id="stab-btn-iomap"
+                aria-selected="false" aria-controls="stab-panel-iomap" tabindex="-1">[<span class="stab-label">input-output map</span>]</button>
+        <button role="tab" data-tab="target" id="stab-btn-target"
+                aria-selected="false" aria-controls="stab-panel-target" tabindex="-1">[<span class="stab-label">input data & target function</span>]</button>
+      </div>
+
+      <div id="stab-panel-hyperparams" class="stab-panel" role="tabpanel" aria-labelledby="stab-btn-hyperparams">
+        <div class="stab-content" id="stab-content-hyperparams"></div>
+      </div>
+      <div id="stab-panel-iomap" class="stab-panel" role="tabpanel" aria-labelledby="stab-btn-iomap">
+        <div class="stab-content" id="stab-content-iomap"></div>
+      </div>
+      <div id="stab-panel-target" class="stab-panel" role="tabpanel" aria-labelledby="stab-btn-target">
+        <div class="stab-content" id="stab-content-target"></div>
+      </div>
+
     </div>
   </div>
 
@@ -325,6 +351,7 @@
   <script src="js/charts.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/simple_sim.js"></script>
+  <script src="js/tabs.js"></script>
   <script src="js/main.js"></script>
 
   <!-- Theme toggle -->
