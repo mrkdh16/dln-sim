@@ -60,7 +60,8 @@ function _targetContent() {
   const inDim  = dims[0];
   if (!actRaw) {
     const P = typeof S_NUM_DATA !== 'undefined' ? S_NUM_DATA : 64;
-    return `<p>The target function is $f^*(x) = U x$ for some fixed diagonal matrix $U \\in \\mathbb{R}^{${inDim} \\times ${inDim}}$ with singular values equally spaced in $(0,1)$. Inputs are drawn i.i.d. from $x^\\mu \\sim \\mathcal{N}(0, I_{${inDim}})$. The network is trained to match this linear map over a fixed dataset of $P = ${P}$ examples.</p>`;
+    return `<p>The target function is $f^*(x) = U x$ for some fixed diagonal matrix $U \\in \\mathbb{R}^{${inDim} \\times ${inDim}}$ with singular values equally spaced in $(0,1)$.<\p>
+    <p>Inputs are drawn i.i.d. from $x^\\mu \\sim \\mathcal{N}(0, I_{${inDim}})$. The network is trained to match this linear map over a fixed dataset of $P = ${P}$ examples.</p>`;
   } else {
     // Nonlinear: g(Ux)
     const gName = typeof s_targetActivation !== 'undefined' && s_targetActivation ? s_targetActivation : actRaw;
