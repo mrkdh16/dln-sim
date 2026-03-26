@@ -2,10 +2,9 @@
 // DETAIL TABS — tabbed panel below the simple widget
 // ============================================================================
 
-const _STAB_KEYS   = ['hyperparams', 'iomap', 'target'];
+const _STAB_KEYS   = ['hyperparams', 'target'];
 const _STAB_LABELS = {
   hyperparams: 'Hyperparameters',
-  iomap:       'Input-Output Map',
   target:      'Input Data & Target Function',
 };
 
@@ -45,15 +44,6 @@ function _hyperparamsContent() {
   return `<div class="stab-kv-grid">${items.join('')}</div>`;
 }
 
-function _iomapContent() {
-  const isLinear = typeof s_activation !== 'undefined' && !s_activation;
-  if (isLinear) {
-    return `<p>The input-output map is defined as the evolving input-output correlation matrix $\\tfrac{1}{P}\\sum_\\mu f(x^\\mu){x^\\mu}^{\\top}$ (For linear networks, this matrix is equivalent to $W_{\\text{total}}$ given whitened input data).</p>`;
-  } else {
-    return `<p>The input-output map is defined as the evolving input-output correlation matrix $\\tfrac{1}{P}\\sum_\\mu f(x^\\mu){x^\\mu}^{\\top}$.</p>`;
-  }
-}
-
 function _targetContent() {
   const dims   = typeof s_dims !== 'undefined' ? s_dims : [6, 6];
   const actRaw = typeof s_activation !== 'undefined' ? s_activation : null;
@@ -63,12 +53,30 @@ function _targetContent() {
     return `<p>The target function is $f^*(x) = U x$ for some fixed diagonal matrix $U \\in \\mathbb{R}^{${inDim} \\times ${inDim}}$ with singular values equally spaced in $(0,1)$.<\p>
     <p>Inputs are drawn i.i.d. from $x^\\mu \\sim \\mathcal{N}(0, I_{${inDim}})$. The network is trained to match this linear map over a fixed dataset of $P = ${P}$ examples.</p>`;
   } else {
-    // Nonlinear: g(Ux)
-    const gName = typeof s_targetActivation !== 'undefined' && s_targetActivation ? s_targetActivation : actRaw;
-    const p     = typeof s_projDim !== 'undefined' && s_projDim ? s_projDim : '?';
-    const actDisplay = gName.charAt(0).toUpperCase() + gName.slice(1);
-    return `<p>The target function is $f^*(x) = \\mathrm{${gName}}(Ux)$, where $U \\in \\mathbb{R}^{${p} \\times ${inDim}}$ is a fixed random Gaussian projection matrix and $\\mathrm{${gName}}(\\cdot)$ is applied elementwise.</p>
-    <p>Inputs are drawn i.i.d. from $x^\\mu \\sim \\mathcal{N}(0, I_{${inDim}})$. The network is trained to match this nonlinear map over a fixed dataset of $P = ${typeof S_NUM_DATA !== 'undefined' ? S_NUM_DATA : 64}$ examples.</p>`;
+    const P = typeof S_NUM_DATA !== 'undefined' ? S_NUM_DATA : 64;
+    const useTeacher = typeof s_useTeacher !== 'undefined' && s_useTeacher;
+    if (useTeacher) {
+      const dims = typeof s_dims !== 'undefined' ? s_dims : [];
+      const depth = dims.length - 1;
+      const archStr = depth === 2
+        ? `$W^*_2\\,\\mathrm{${actRaw}}(W^*_1 x)$`
+        : depth === 3
+        ? `$W^*_3\\,\\mathrm{${actRaw}}(W^*_2\\,\\mathrm{${actRaw}}(W^*_1 x))$`
+        : `$W^*_${depth}\\,\\mathrm{${actRaw}}(\\cdots\\,\\mathrm{${actRaw}}(W^*_1 x))$`;
+      const weights = depth === 2
+        ? ['$W^*_1$', '$W^*_2$']
+        : depth === 3
+        ? ['$W^*_1$', '$W^*_2$', '$W^*_3$']
+        : Array.from({ length: depth }, (_, i) => `W^*_${i + 1}`);
+      return `<p>The target function is a fixed teacher network with the same architecture as the student: ${archStr}. The teacher weights ${weights} are sampled once at initialization and stay fixed.</p>
+    <p>Inputs are drawn i.i.d. from $x^\\mu \\sim \\mathcal{N}(0, I_{${inDim}})$. The student is trained to match the teacher's outputs over a fixed dataset of $P = ${P}$ examples.</p>`;
+    } else {
+      // Legacy: g(Ux)
+      const gName = typeof s_targetActivation !== 'undefined' && s_targetActivation ? s_targetActivation : actRaw;
+      const p     = typeof s_projDim !== 'undefined' && s_projDim ? s_projDim : '?';
+      return `<p>The target function is $f^*(x) = \\mathrm{${gName}}(Ux)$, where $U \\in \\mathbb{R}^{${p} \\times ${inDim}}$ is a fixed random Gaussian projection matrix and $\\mathrm{${gName}}(\\cdot)$ is applied elementwise.</p>
+    <p>Inputs are drawn i.i.d. from $x^\\mu \\sim \\mathcal{N}(0, I_{${inDim}})$. The network is trained to match this nonlinear map over a fixed dataset of $P = ${P}$ examples.</p>`;
+    }
   }
 }
 
@@ -120,10 +128,6 @@ function _selectStab(key, animate) {
   });
 }
 
-function openIomapTab() {
-  _selectStab('iomap', true);
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 function updateSimpleTabs() {
@@ -141,7 +145,6 @@ function updateSimpleTabs() {
 function _buildStabContent(key) {
   switch (key) {
     case 'hyperparams': return _hyperparamsContent();
-    case 'iomap':       return _iomapContent();
     case 'target':      return _targetContent();
     default:            return '';
   }

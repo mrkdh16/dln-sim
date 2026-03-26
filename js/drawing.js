@@ -98,11 +98,41 @@ function _flushLabels() {
   _pendingLabels = [];
 }
 
+// ── Canvas height guard ───────────────────────────────────────────────────────
+// Grows canvas-panel so the e2e SV histogram is never clipped.
+// Must be called before layout variables are computed in draw().
+
+function _ensureCanvasHeight() {
+  const depth    = getDepth();
+  const trapW    = Math.max(54, Math.min(110, (canvasW - 88) / depth * 0.85));
+  const svBarH   = Math.round(Math.max(22, Math.min(44, trapW * 0.5)));
+  const maxHalfH = dimH(Math.max(...dims)) / 2;
+  const chainY   = maxHalfH + 44;
+
+  const hasSVData  = latestSVs(0) !== null;
+  const svBotY     = chainY + maxHalfH + 12 + (hasSVData ? svBarH : 0);
+  const e2eMaxH    = Math.max(dimH(dims[0]), dimH(dims[depth]));
+  const e2eTrapW   = Math.min(trapW * 1.15, 120);
+  const e2eY       = svBotY + 26 + e2eMaxH / 2;
+  const hasE2ESVs  = latestSVs(depth) !== null;
+  const e2eSVBarH  = hasE2ESVs ? Math.round(Math.max(22, Math.min(44, e2eTrapW * 0.5))) : 0;
+  const needed     = Math.ceil(e2eY + e2eMaxH / 2 + (hasE2ESVs ? 10 + e2eSVBarH : 0) + 20);
+
+  const panel = document.getElementById('canvas-panel');
+  if (panel && needed > canvasH) {
+    panel.style.flex = `0 0 ${needed}px`;
+    resizeCanvas(); // updates canvasH / canvasW before layout runs
+  }
+}
+
 // ── Main draw ────────────────────────────────────────────────────────────────
 
 function draw() {
   const canvas = document.getElementById('main-canvas');
   if (!canvas) return;
+
+  _ensureCanvasHeight();
+
   const ctx = canvas.getContext('2d');
 
   ctx.clearRect(0, 0, canvasW, canvasH);
@@ -118,6 +148,7 @@ function draw() {
   // Trapezoid geometry
   const availW   = canvasW - 2 * margin;
   const trapW    = Math.max(54, Math.min(110, availW / depth * 0.85));
+  const svBarH   = Math.round(Math.max(22, Math.min(44, trapW * 0.5)));
   const totalW   = trapW * depth;
   const startX   = canvasW / 2 - totalW / 2;
   const maxHalfH = dimH(Math.max(...dims)) / 2;
@@ -166,18 +197,9 @@ function draw() {
     // SV bars below chain
     const svs = latestSVs(i);
     if (svs) {
-      drawSVBars(ctx, tx, chainY + maxHalfH + 12, trapW, 44, svs);
+      _addLabel(tx + trapW / 2, chainY + maxHalfH + 9, '\\hat{s}_i', '#8c959f', 11, true);
+      drawSVBars(ctx, tx, chainY + maxHalfH + 12, trapW, svBarH, svs);
     }
-  }
-
-  // ── Dimension labels at junctions (above chain) ────────────────────────────
-  for (let i = 0; i <= depth; i++) {
-    const jx = startX + i * trapW;
-    const jH = dimH(dims[i]);
-    ctx.fillStyle = '#8c959f';
-    ctx.font      = '10px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(String(dims[i]), jx, chainY - jH / 2 - 7);
   }
 
   // ── "y" label + arrow ─────────────────────────────────────────────────────
@@ -194,13 +216,14 @@ function draw() {
   const e2eMaxH  = Math.max(e2eLH, e2eRH);
   const e2eTrapW = Math.min(trapW * 1.15, 120);
   const e2eX     = canvasW / 2 - e2eTrapW / 2;
-  const svBotY   = chainY + maxHalfH + 12 + 44; // bottom of chain SV bars
-  const e2eY     = svBotY + 16 + e2eMaxH / 2;   // center of e2e trapezoid
-  const isE2ESel = (selectedMatrixIdx === depth);
+  const hasSVData   = latestSVs(0) !== null;
+  const svBotY      = chainY + maxHalfH + 12 + (hasSVData ? svBarH : 0); // bottom of chain area
+  const underbraceY = svBotY + 8;
+  const e2eY        = underbraceY + 18 + e2eMaxH / 2; // underbrace tip(10) + gap(8) + half-box
+  const isE2ESel    = (selectedMatrixIdx === depth);
 
-  // Caption above the e2e box — KaTeX overlay
-  _addLabel(canvasW / 2, e2eY - e2eMaxH / 2 - 14,
-    'W_{\\text{total}} = W_L \\cdots W_1', '#8c959f', 10, true);
+  // ── Underbrace below chain ──────────────────────────────────────────────
+  drawUnderbrace(ctx, startX, startX + totalW, underbraceY);
 
   drawTrapezoid(ctx, e2eX, e2eY, e2eTrapW, e2eLH, e2eRH, isE2ESel, true);
 
@@ -222,7 +245,9 @@ function draw() {
 
   const e2eSVs = latestSVs(depth);
   if (e2eSVs) {
-    drawSVBars(ctx, e2eX, e2eY + e2eMaxH / 2 + 10, e2eTrapW, 44, e2eSVs);
+    const e2eSVBarH = Math.round(Math.max(22, Math.min(44, e2eTrapW * 0.5)));
+    _addLabel(canvasW / 2, e2eY + e2eMaxH / 2 + 7, '\\hat{s}_i', '#8c959f', 11, true);
+    drawSVBars(ctx, e2eX, e2eY + e2eMaxH / 2 + 10, e2eTrapW, e2eSVBarH, e2eSVs);
   }
 
   _flushLabels();
@@ -252,10 +277,12 @@ function drawTrapezoid(ctx, x, cy, w, lH, rH, selected, isE2E) {
 
 function drawSVBars(ctx, x, y, w, h, svs) {
   if (!svs || svs.length === 0) return;
-  const n    = svs.length;
-  const gap  = 2;
-  const barW = Math.max(1, (w - gap * (n - 1)) / n);
-  const maxV = Math.max(...svs, 1e-9);
+  // Limit bars to what fits at ≥2px wide with 1px gap
+  const maxBars = Math.max(1, Math.floor((w + 1) / 3));
+  const n    = Math.min(svs.length, maxBars);
+  const gap  = n > 1 ? 1 : 0;
+  const barW = n > 1 ? (w - gap * (n - 1)) / n : w;
+  const maxV = Math.max(...svs.slice(0, n), 1e-9);
 
   for (let i = 0; i < n; i++) {
     const bh = Math.max(1, (svs[i] / maxV) * h);
@@ -270,6 +297,31 @@ function drawSVBars(ctx, x, y, w, h, svs) {
   ctx.beginPath();
   ctx.moveTo(x,     y + h);
   ctx.lineTo(x + w, y + h);
+  ctx.stroke();
+}
+
+function drawUnderbrace(ctx, x1, x2, y) {
+  const cx   = (x1 + x2) / 2;
+  const sH   = 5;  // upward serif height at ends
+  const tipH = 10; // downward center tick height
+
+  ctx.strokeStyle = '#8c959f';
+  ctx.lineWidth   = 1.5;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+
+  // Horizontal bar with upward end serifs
+  ctx.beginPath();
+  ctx.moveTo(x1, y - sH);
+  ctx.lineTo(x1, y);
+  ctx.lineTo(x2, y);
+  ctx.lineTo(x2, y - sH);
+  ctx.stroke();
+
+  // Center downward tick pointing toward W_total
+  ctx.beginPath();
+  ctx.moveTo(cx, y);
+  ctx.lineTo(cx, y + tipH);
   ctx.stroke();
 }
 
@@ -343,6 +395,8 @@ function refreshSVPanel() {
     theoryRow.style.display = 'none';
     titleEl.textContent     = 'singular values';
     if (togglesEl) togglesEl.style.display = 'none';
+    const ttl = document.getElementById('show-theory-toggle')?.closest('label');
+    if (ttl) ttl.style.display = '';
     return;
   }
 
@@ -350,6 +404,10 @@ function refreshSVPanel() {
   if (togglesEl) togglesEl.style.display = '';
 
   const isE2E     = (selectedMatrixIdx === depth);
+
+  // Theory toggle only applies to the e2e product
+  const theoryToggleLabel = document.getElementById('show-theory-toggle')?.closest('label');
+  if (theoryToggleLabel) theoryToggleLabel.style.display = isE2E ? '' : 'none';
   const hasHistory = svHistories[selectedMatrixIdx] &&
                      svHistories[selectedMatrixIdx].length > 0;
 

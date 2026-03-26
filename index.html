@@ -76,7 +76,7 @@
               </div>
             </div>
             <div class="simple-chart-section" id="simple-sv-section">
-              <div class="simple-chart-title">singular values of the input-output map<button class="sv-iomap-asterisk" onclick="openIomapTab()" aria-label="About the input-output map">*</button></div>
+              <div class="simple-chart-title">singular values of the first weight matrix $W_1$</div>
               <div class="simple-chart-wrap">
                 <canvas id="simple-sv-chart"></canvas>
               </div>
@@ -96,7 +96,7 @@
             <div class="preset-card-desc">piecewise linear</div>
             <span class="preset-card-reset"><i class="fas fa-rotate-left"></i></span>
           </button>
-          <button class="preset-card active" data-preset="relu_deep">
+          <button class="preset-card" data-preset="relu_deep">
             <div class="preset-card-header">
               <span class="preset-card-depth">depth = 3</span>
               <span class="preset-card-play-icon"><i class="fas fa-play"></i></span>
@@ -105,7 +105,7 @@
             <div class="preset-card-desc">piecewise linear</div>
             <span class="preset-card-reset"><i class="fas fa-rotate-left"></i></span>
           </button>
-          <button class="preset-card" data-preset="tanh">
+          <button class="preset-card active" data-preset="tanh">
             <div class="preset-card-header">
               <span class="preset-card-depth">depth = 3</span>
               <span class="preset-card-play-icon"><i class="fas fa-play"></i></span>
@@ -130,19 +130,14 @@
       <div id="stab-bar" role="tablist" aria-label="Simulation details">
         <button role="tab" data-tab="hyperparams" id="stab-btn-hyperparams"
                 aria-selected="false" aria-controls="stab-panel-hyperparams" tabindex="0">[<span class="stab-label">hyperparameters</span>]</button>
-        <button role="tab" data-tab="iomap" id="stab-btn-iomap"
-                aria-selected="false" aria-controls="stab-panel-iomap" tabindex="-1">[<span class="stab-label">input-output map</span>]</button>
-        <button role="tab" data-tab="target" id="stab-btn-target"
+<button role="tab" data-tab="target" id="stab-btn-target"
                 aria-selected="false" aria-controls="stab-panel-target" tabindex="-1">[<span class="stab-label">input data & target function</span>]</button>
       </div>
 
       <div id="stab-panel-hyperparams" class="stab-panel" role="tabpanel" aria-labelledby="stab-btn-hyperparams">
         <div class="stab-content" id="stab-content-hyperparams"></div>
       </div>
-      <div id="stab-panel-iomap" class="stab-panel" role="tabpanel" aria-labelledby="stab-btn-iomap">
-        <div class="stab-content" id="stab-content-iomap"></div>
-      </div>
-      <div id="stab-panel-target" class="stab-panel" role="tabpanel" aria-labelledby="stab-btn-target">
+<div id="stab-panel-target" class="stab-panel" role="tabpanel" aria-labelledby="stab-btn-target">
         <div class="stab-content" id="stab-content-target"></div>
       </div>
 

@@ -236,22 +236,6 @@ html, body {
   line-height: 1.4;
 }
 
-/* Asterisk link in SV chart title */
-.sv-iomap-asterisk {
-  background: none;
-  border: none;
-  padding: 0;
-  margin-left: 1px;
-  font-family: inherit;
-  font-size: 0.85em;
-  vertical-align: super;
-  color: var(--meta-color);
-  cursor: pointer;
-  line-height: 1;
-  transition: color 0.15s;
-}
-.sv-iomap-asterisk:hover { color: var(--text-color); }
-
 .sv-legend-hint {
   opacity: 0.8;
 }
@@ -510,8 +494,7 @@ html, body {
 /* Math */
 #article .katex-display {
   margin: 1.2em 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
   padding: 0.5em 0;
 }
 .katex { font-size: 1.05em; }

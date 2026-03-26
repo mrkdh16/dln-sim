@@ -23,8 +23,8 @@ window.addEventListener('DOMContentLoaded', () => {
   applyPresetConfig('depth2');
   draw();
 
-  // 7. Simple widget: auto-start with deep ReLU
-  s_applyPreset('relu_deep');
+  // 7. Simple widget: auto-start with tanh preset
+  s_applyPreset('tanh');
   s_startSim();
 });
 

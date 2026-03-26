@@ -2,7 +2,7 @@
 #### The Toy Model and Task
 Consider a 2-layer linear network $\hat{y} = W_2 W_1 x$ trained on examples ${x^\mu, y^\mu}$ ($\mu = 1, \ldots, P$) with mean-squared error loss: $$
 
-\mathcal{E} = \sum_{\mu=1}^{P} \frac{1}{2}|y^\mu - W_2 W_1 x^\mu|_2^2.
+\mathcal{E} = \sum_{\mu=1}^{P} \frac{1}{2}||y^\mu - W_2 W_1 x^\mu||_2^2.
 
 $$ Let the input $x^\mu \in \mathbb{R}^{N_1}$, output $y^\mu \in \mathbb{R}^{N_3}$, $W_1 \in \mathbb{R}^{N_2 \times N_1}$, $W_2 \in \mathbb{R}^{N_3 \times N_2}$, where $N_2$ is the hidden dimension.
 
@@ -100,7 +100,7 @@ The analysis above was carried out for a 2-layer network, but the same framework
 On the symmetric submanifold where all per-layer amplitudes are equal ($a^i_\alpha = a_\alpha$ for all $i$), the ODE for the overall mode strength generalizes from Equation (9) to
 $$
 
-\frac{d\hat{s}_\alpha}{dt} = L\,\hat{s}_\alpha^{\,2 - 2/L}(s_\alpha - \hat{s}_\alpha). \tag{11}
+\boxed{\frac{d\hat{s}_\alpha}{dt} = L\,\hat{s}_\alpha^{\,2 - 2/L}(s_\alpha - \hat{s}_\alpha).} \tag{11}
 
 $$
 The structure is recognizably similar: the same $(s_\alpha - \hat{s}_\alpha)$ driving term appears, and learning is still ordered by singular value strength. What changes is the power of $\hat{s}_\alpha$ multiplying this term. For $L=2$, the exponent $2 - 2/L$ equals 1 and we recover $2\hat{s}_\alpha(s_\alpha - \hat{s}_\alpha)$, which is the separable logistic equation we solved in closed form above. But for any deeper network, the exponent is nonzero and the ODE becomes much more complicated. To obtain the time course of learning in deeper networks, it's easiest to numerically integrate Equation (11). The simulator below does exactly this, letting you vary network depth and observe how the sigmoid transitions sharpen and the learning dynamics change.
@@ -116,7 +116,7 @@ When $s_\alpha \gg \hat{s}_\alpha^0$ (small initialization relative to the signa
 
 <div class="scroll-prompt-line"></div>
 
-<p>Try the interactive simulator below — configure the network, start training, and watch singular values evolve</p>
+<p style="text-align:center">Try the interactive simulator below — configure the network, start training, and watch singular values evolve</p>
 
 <div class="scroll-arrow">↓</div>
 

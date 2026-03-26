@@ -16,12 +16,14 @@ let s_learningRate = 0.01;
 let s_initScale    = 0.01;
 
 let s_weightVars       = [];
+let s_teacherVars      = [];   // fixed teacher tensors (not trained)
 let s_targetMatrix     = null;
 let s_inputData        = null;  // fixed random inputs X,    shape [d_in,  S_NUM_DATA]
 let s_targetData       = null;  // targets Y,                shape [d_out, S_NUM_DATA]
 let s_projMatrix       = null;  // p × d_in projection U for nonlinear targets
 let s_targetActivation = null;  // elementwise g in y = g(Ux); null → linear y = W*x
 let s_projDim          = null;  // p (output dim of U)
+let s_useTeacher       = true; // use teacher network to generate targets
 
 let s_lossHistory  = [];
 let s_svHistories  = [];   // s_svHistories[s_getDepth()] = e2e SVs
@@ -31,7 +33,8 @@ let s_completed    = false; // true once the sim finishes naturally
 let s_iterCount    = 0;
 let s_frameCount   = 0;
 let s_animFrameId  = null;
-let s_stopAt       = null; // set to 3T when loss first crosses 0.1
+let s_stopAt       = null; // set to 3T when loss first crosses threshold
+let s_stopAtTime   = null; // wall-clock time (ms) when s_stopAt was set
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +46,8 @@ function s_getE2EShape()     { return [s_dims[s_dims.length - 1], s_dims[0]]; }
 
 function s_initSim() {
   s_weightVars.forEach(v => { try { v.dispose(); } catch (_) {} });
+  s_teacherVars.forEach(t => { try { t.dispose(); } catch (_) {} });
+  s_teacherVars = [];
   if (s_targetMatrix) { try { s_targetMatrix.dispose(); } catch (_) {} s_targetMatrix = null; }
   if (s_projMatrix)   { try { s_projMatrix.dispose();   } catch (_) {} s_projMatrix   = null; }
   if (s_inputData)    { try { s_inputData.dispose();    } catch (_) {} s_inputData    = null; }
@@ -68,13 +73,31 @@ function s_initSim() {
   // Fixed random dataset: x^μ ~ N(0, I)
   s_inputData = tf.randomNormal([inDim, S_NUM_DATA]);
 
-  // Targets: y^μ = g(U x^μ) for nonlinear presets, or y^μ = W* x^μ for linear
-  if (s_targetActivation && s_projDim) {
+  // Targets: teacher network for nonlinear presets, or y^μ = W* x^μ for linear
+  if (s_useTeacher) {
+    const depth = s_getDepth();
+    for (let i = 0; i < depth; i++) {
+      const [rows, cols] = s_getWeightShape(i);
+      s_teacherVars.push(tf.mul(tf.randomNormal([rows, cols]), 1 / Math.sqrt(cols)));
+    }
+    const act = s_activation === 'relu'    ? tf.relu
+              : s_activation === 'tanh'    ? tf.tanh
+              : s_activation === 'sigmoid' ? tf.sigmoid
+              : s_activation === 'sin'     ? tf.sin : tf.relu;
+    s_targetData = tf.tidy(() => {
+      let h = tf.matMul(s_teacherVars[0], s_inputData);
+      for (let i = 1; i < s_teacherVars.length; i++) {
+        h = act(h);
+        h = tf.matMul(s_teacherVars[i], h);
+      }
+      return h;
+    });
+  } else if (s_targetActivation && s_projDim) {
     const act = s_targetActivation === 'relu'    ? tf.relu
               : s_targetActivation === 'tanh'    ? tf.tanh
               : s_targetActivation === 'sigmoid' ? tf.sigmoid
               : s_targetActivation === 'sine'    ? tf.sin : tf.relu;
-    s_projMatrix = tf.randomNormal([s_projDim, inDim]);
+    s_projMatrix = tf.mul(tf.randomNormal([s_projDim, inDim]), 1 / Math.sqrt(inDim));
     s_targetData = act(tf.matMul(s_projMatrix, s_inputData));
   } else {
     s_targetData = tf.matMul(s_targetMatrix, s_inputData);
@@ -85,6 +108,7 @@ function s_initSim() {
   s_iterCount   = 0;
   s_frameCount  = 0;
   s_stopAt      = null;
+  s_stopAtTime  = null;
   s_completed   = false;
   s_hideAllCardResets();
 }
@@ -135,18 +159,12 @@ function s_getCurrentLoss() {
 }
 
 // ── SV recording ─────────────────────────────────────────────────────────────
-// Plots singular values of the input-output correlation matrix f(X) Xᵀ / P.
-// For a linear network this equals W_e2e (X Xᵀ / P) ≈ W_e2e under whitened inputs.
-// For a nonlinear network it captures the effective linear readout of the learned map.
+// Plots singular values of the first weight matrix W_1.
 
 function s_recordSVs() {
   const depth  = s_getDepth();
-  const e2eSVs = tf.tidy(() => {
-    const fX   = s_computeForwardOn(s_inputData);
-    const corr = tf.div(tf.matMul(fX, tf.transpose(s_inputData)), S_NUM_DATA);
-    return computeSVs(corr);
-  });
-  s_svHistories[depth].push({ iter: s_iterCount, svs: e2eSVs });
+  const svs = tf.tidy(() => computeSVs(s_weightVars[0]));
+  s_svHistories[depth].push({ iter: s_iterCount, svs });
 }
 
 // ── Animation loop ────────────────────────────────────────────────────────────
@@ -167,11 +185,12 @@ function s_simulationLoop() {
   s_frameCount++;
   if (s_frameCount % S_CHART_UPDATE_EVERY === 0) updateSimpleCharts();
 
-  if (s_stopAt === null && currentLoss < 0.1) {
+  if (s_stopAt === null && currentLoss < 0.05) {
     s_stopAt = 3 * s_iterCount; // stop at 3T
+    s_stopAtTime = performance.now();
   }
 
-  if (s_stopAt !== null && s_iterCount >= s_stopAt) {
+  if (s_stopAt !== null && s_iterCount >= s_stopAt && (performance.now() - s_stopAtTime) >= 10000) {
     updateSimpleCharts();
     s_completed = true;
     s_pauseSim();
@@ -237,6 +256,7 @@ function s_applyPreset(key) {
   s_activation       = p.activation       || null;
   s_targetActivation = p.targetActivation || null;
   s_projDim          = p.projDim          || null;
+  s_useTeacher       = p.useTeacher       || false;
 
   updateEquation(key);
 
