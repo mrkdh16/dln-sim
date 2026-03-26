@@ -388,6 +388,10 @@ html, body {
 }
 #page-intro p:last-child { margin-bottom: 0; }
 
+#page-intro a              { color: var(--link-color); text-decoration: none; }
+#page-intro a:visited      { color: var(--link-visited); }
+#page-intro a:hover        { color: var(--link-hover); }
+
 /* ════════════════════════════════════════════════════════════
    ARTICLE SECTION
    ════════════════════════════════════════════════════════════ */
