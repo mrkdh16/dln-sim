@@ -1,0 +1,364 @@
+/* ============================================================================
+   MODULAR WIDGET STYLES
+   Shared styles for createSVTheoryWidget, createLossWidget,
+   createLinearNonlinearWidget, and createAlignmentWidget.
+   ============================================================================ */
+
+/* ── Widget shell ──────────────────────────────────────────────────────────── */
+
+.dln-widget {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: #24292f;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  padding: 14px 16px 12px;
+  margin: 1.5em 0;
+}
+
+/* ── Controls bar ──────────────────────────────────────────────────────────── */
+
+.dln-widget-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dln-ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dln-ctrl-right {
+  margin-left: auto;
+}
+
+.dln-ctrl-label {
+  color: #57606a;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
+
+.dln-btn {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  background: #f6f8fa;
+  color: #24292f;
+  cursor: pointer;
+  line-height: 1.5;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+
+.dln-btn:hover {
+  background: #eaeef2;
+  border-color: #bbc0c5;
+}
+
+.dln-depth-btn.active {
+  background: #0969da;
+  border-color: #0969da;
+  color: #ffffff;
+}
+
+.dln-btn-row {
+  display: flex;
+  gap: 2px;
+}
+
+.dln-btn-row .dln-btn {
+  border-radius: 3px;
+}
+
+/* ── Slider ────────────────────────────────────────────────────────────────── */
+
+.dln-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 90px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d0d7de;
+  outline: none;
+  cursor: pointer;
+}
+
+.dln-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #0969da;
+  cursor: pointer;
+}
+
+.dln-scale-display {
+  font-size: 11px;
+  color: #57606a;
+  min-width: 28px;
+}
+
+/* ── Chart wrap ────────────────────────────────────────────────────────────── */
+
+.dln-chart-wrap {
+  position: relative;
+  height: 220px;
+}
+
+/* ── Legend ────────────────────────────────────────────────────────────────── */
+
+.dln-legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 6px;
+  justify-content: flex-end;
+}
+
+.dln-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #57606a;
+}
+
+.dln-legend-solid,
+.dln-legend-dashed {
+  display: inline-block;
+  width: 22px;
+  height: 2px;
+  background: #57606a;
+}
+
+.dln-legend-dashed {
+  background: repeating-linear-gradient(
+    to right,
+    #57606a 0, #57606a 4px,
+    transparent 4px, transparent 7px
+  );
+}
+
+/* Colored legend badge (alignment widget) */
+.dln-legend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #57606a;
+  border-left: 3px solid var(--badge-color, #888);
+  padding-left: 6px;
+}
+
+/* ── Linear-Nonlinear widget layout ────────────────────────────────────────── */
+
+.dln-ln-widget {
+  padding: 10px;
+}
+
+.dln-ln-columns {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.dln-preset-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 120px;
+}
+
+.dln-preset-col-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #57606a;
+  padding: 0 2px;
+}
+
+.dln-ln-center {
+  flex: 1;
+  min-width: 0;
+}
+
+.dln-ln-charts {
+  display: flex;
+  gap: 10px;
+}
+
+.dln-ln-chart-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.dln-ln-chart-title {
+  font-size: 11px;
+  color: #57606a;
+  margin-bottom: 4px;
+}
+
+.dln-ln-eq {
+  text-align: center;
+  font-size: 13px;
+  color: #24292f;
+  margin-top: 6px;
+  min-height: 1.4em;
+}
+
+/* ── Preset cards ──────────────────────────────────────────────────────────── */
+
+.dln-preset-card {
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 9px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #f6f8fa;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.dln-preset-card:hover {
+  background: #eaeef2;
+  border-color: #bbc0c5;
+}
+
+.dln-preset-card.active {
+  background: rgba(9,105,218,0.08);
+  border-color: #0969da;
+}
+
+.dln-preset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dln-preset-depth {
+  font-size: 10px;
+  color: #57606a;
+}
+
+.dln-preset-icon {
+  font-size: 10px;
+  color: #57606a;
+}
+
+.dln-preset-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #24292f;
+}
+
+.dln-preset-desc {
+  font-size: 10px;
+  color: #57606a;
+}
+
+.dln-preset-reset {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 11px;
+  color: #0969da;
+}
+
+/* ── Alignment widget ───────────────────────────────────────────────────────── */
+
+.dln-align-top {
+  margin-bottom: 6px;
+}
+
+.dln-align-loss-block {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Slider row */
+.dln-align-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.dln-align-iter-label {
+  font-size: 11px;
+  color: #57606a;
+  min-width: 90px;
+  text-align: right;
+}
+
+.dln-align-status {
+  font-size: 11px;
+  color: #57606a;
+}
+
+/* Column headers above the heatmap grid */
+.dln-align-col-hdrs {
+  display: grid;
+  grid-template-columns: 54px repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.dln-align-col-hdr {
+  text-align: center;
+}
+
+.dln-align-col-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dln-align-col-sub {
+  font-size: 10px;
+  color: #57606a;
+}
+
+/* Heatmap rows (row-label + 3 cells) */
+.dln-align-hm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dln-align-hm-row {
+  display: grid;
+  grid-template-columns: 54px repeat(3, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.dln-align-row-label {
+  font-size: 11px;
+  color: #57606a;
+  text-align: right;
+  padding-right: 4px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+/* Each heatmap cell: square, sized by grid */
+.dln-align-hm-cell {
+  aspect-ratio: 1;
+  border: 1px solid #d0d7de;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #ffffff;
+}
