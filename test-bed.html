@@ -85,10 +85,10 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
-      createLinearNonlinearWidget('w-ln',    { autoStart: true });
-      createSVTheoryWidget(       'w-sv',    { depth: 3, autoStart: true });
-      createLossWidget(           'w-loss',  { depth: 3, autoStart: true });
-      createAlignmentWidget(      'w-align', { autoStart: true });
+      createLinearNonlinearWidget('w-ln',    { autoStart: false });
+      createSVTheoryWidget(       'w-sv',    { depth: 3, autoStart: false });
+      createLossWidget(           'w-loss',  { depth: 3, autoStart: false });
+      createAlignmentWidget(      'w-align', 'alignment_data.json', { autoStart: false });
     });
   </script>
 

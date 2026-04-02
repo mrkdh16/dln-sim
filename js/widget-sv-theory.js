@@ -17,18 +17,17 @@ function createSVTheoryWidget(containerId, opts) {
   // ── Constants ──────────────────────────────────────────────────────────────
   const STEPS_PER_FRAME = 20;
   const SV_RECORD_EVERY = 40;
-  const DIMS            = 6;   // square network: N_in = N_out = N_hidden = 6
+  const DIMS            = 6;
   const MAX_ITERS       = 80000;
 
-  // Auto hyperparameters: lr chosen so convergence is visible but not instant
   const DEPTH_CFG = {
-    1: { lr: 0.01,   initScale: 0.01 },
-    2: { lr: 0.005,  initScale: 0.01 },
-    3: { lr: 0.005,  initScale: 0.01 },
+    1: { lr: 0.01,  initScale: 0.01 },
+    2: { lr: 0.005, initScale: 0.01 },
+    3: { lr: 0.005, initScale: 0.01 },
     4: { lr: 0.005, initScale: 0.01 },
   };
 
-  // ── Closed state ───────────────────────────────────────────────────────────
+  // ── State ──────────────────────────────────────────────────────────────────
   let depth      = opts.depth || 3;
   let lr         = null;
   let initScale  = null;
@@ -47,9 +46,9 @@ function createSVTheoryWidget(containerId, opts) {
   let stopAtWall   = null;
   let odeCache     = new Map();
 
-  let chart     = null;
-  let uid       = dlnUID();
-  let root      = null;
+  let chart = null;
+  const uid = dlnUID();
+  let root  = null;
 
   // ── DOM ────────────────────────────────────────────────────────────────────
 
@@ -65,12 +64,12 @@ function createSVTheoryWidget(containerId, opts) {
     root.innerHTML = `
       <div class="dln-widget-controls">
         <div class="dln-ctrl-group">
-          <span class="dln-ctrl-label">depth</span>
+          <span class="dln-ctrl-label">Depth</span>
           <div class="dln-btn-row">${depthBtns}</div>
         </div>
-        <div class="dln-ctrl-group dln-ctrl-right">
-          <button class="dln-btn dln-play-btn">&#9654; start</button>
-          <button class="dln-btn dln-reset-btn">&#8635; reset</button>
+        <div class="dln-ctrl-group" style="margin-left:auto;gap:6px;">
+          <button class="dln-btn dln-play-btn">&#9654; Start</button>
+          <button class="dln-btn dln-reset-btn">Reset</button>
         </div>
       </div>
       <div class="dln-chart-wrap">
@@ -113,27 +112,29 @@ function createSVTheoryWidget(containerId, opts) {
 
   function _updateChart() {
     if (!chart || svHistory.length === 0) return;
-    const pts    = dlnDownsample(svHistory, 300);
-    const iters  = pts.map(p => p.iter);
-    const numSVs = Math.min(pts[pts.length - 1].svs.length, DIMS);
+    const pts     = dlnDownsample(svHistory, 300);
+    const iters   = pts.map(p => p.iter);
+    const numSVs  = Math.min(pts[pts.length - 1].svs.length, DIMS);
     const hasTheory = targetSVs.length > 0 && initE2ESVs.length > 0;
-    const need   = numSVs * (hasTheory ? 2 : 1);
+    const need    = numSVs * (hasTheory ? 2 : 1);
 
     if (chart.data.datasets.length !== need) {
       chart.data.datasets = [];
+      // Empirical: solid lines
       for (let i = 0; i < numSVs; i++) {
         chart.data.datasets.push({
           data: [], borderColor: DLN_SV_COLORS[i % DLN_SV_COLORS.length],
-          backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0,
-          tension: 0, borderDash: [], _g: 'emp',
+          backgroundColor: 'transparent', borderWidth: 2,
+          pointRadius: 0, tension: 0, borderDash: [],
         });
       }
+      // Theory: dashed lines, same color, thinner
       if (hasTheory) {
         for (let i = 0; i < numSVs; i++) {
           chart.data.datasets.push({
             data: [], borderColor: DLN_SV_COLORS[i % DLN_SV_COLORS.length],
-            backgroundColor: 'transparent', borderWidth: 1.2, pointRadius: 0,
-            tension: 0, borderDash: [3, 3], _g: 'theory',
+            backgroundColor: 'transparent', borderWidth: 1.2,
+            pointRadius: 0, tension: 0, borderDash: [5, 4],
           });
         }
       }
@@ -186,17 +187,14 @@ function createSVTheoryWidget(containerId, opts) {
       init.dispose();
     }
 
-    // Target: SVs equally spaced in (0, 1)
     const diagVals = tf.tensor1d(
       Array.from({ length: DIMS }, (_, i) => (DIMS - i) / (DIMS + 1))
     );
     targetMatrix = tf.diag(diagVals);
     diagVals.dispose();
 
-    // Aligned (balanced) init for clean theory curves
     dlnAlignedInit(weightVars, dims, targetMatrix, initScale);
 
-    // Record target SVs and initial e2e SVs for theory overlay
     targetSVs  = dlnComputeSVs(targetMatrix);
     initE2ESVs = tf.tidy(() => {
       let e2e = weightVars[0];
@@ -226,8 +224,6 @@ function createSVTheoryWidget(containerId, opts) {
     svHistory.push({ iter: iterCount, svs });
   }
 
-  // Stop criterion: run until smallest SV has reached 95% of its target,
-  // then keep going until 3× that iteration (and at least 8 wall-clock seconds).
   function _checkStop() {
     if (iterCount > MAX_ITERS) { _finish(); return true; }
     if (svHistory.length === 0) return false;
@@ -265,13 +261,14 @@ function createSVTheoryWidget(containerId, opts) {
   function _syncPlayBtn() {
     const btn = root && root.querySelector('.dln-play-btn');
     if (!btn) return;
-    btn.innerHTML = completed ? '&#8635; replay'
-                  : isRunning ? '&#9646;&#9646; pause'
-                  : '&#9654; start';
+    btn.innerHTML = completed ? '&#8635; Replay'
+                  : isRunning ? '&#9646;&#9646; Pause'
+                  : '&#9654; Start';
   }
 
   function _start() {
     if (isRunning) return;
+    WidgetManager.requestStart(uid);
     if (weightVars.length === 0) _initSim();
     isRunning = true;
     _syncPlayBtn();
@@ -281,6 +278,7 @@ function createSVTheoryWidget(containerId, opts) {
   function _pause() {
     isRunning = false;
     if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+    WidgetManager.notifyStop(uid);
     _syncPlayBtn();
   }
 
@@ -296,7 +294,12 @@ function createSVTheoryWidget(containerId, opts) {
   buildDOM();
   _initChart();
   _initSim();
-  if (opts.autoStart !== false) _start();
+  WidgetManager.register(uid, _pause);
+  if (opts.autoStart !== false) {
+    _start();
+  } else {
+    dlnScrollAutoplay(root, _start);
+  }
 
   return { start: _start, pause: _pause, reset: _reset };
 }

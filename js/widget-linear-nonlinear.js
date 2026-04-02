@@ -1,61 +1,57 @@
 // ============================================================================
-// WIDGET: LINEAR vs NONLINEAR
-// A self-contained version of the simple preset-card widget from index.html.
-// Shows loss and first-layer singular values for various network presets.
+// WIDGET: LINEAR vs NONLINEAR  (data-driven version)
+//
+// Loads pre-computed data from a JSON file (produced by precompute_ln.py).
+// Supports animated playback with play/pause and a time scrubber slider.
+//
+// Expected JSON format:
+//   {
+//     "depth1":       { "loss": [{iter, loss}, ...], "svs": [{iter, svs:[...]}, ...] },
+//     "depth2":       { ... },
+//     "depth3":       { ... },
+//     "relu_shallow": { ... },
+//     "relu_deep":    { ... },
+//     "tanh":         { ... }
+//   }
 //
 // Usage:
 //   <div id="my-widget"></div>
-//   <script> createLinearNonlinearWidget('my-widget'); </script>
+//   <script>
+//     createLinearNonlinearWidget('my-widget', { dataUrl: 'linear_nonlinear_data.json' });
+//   </script>
 //
-// Requires (loaded first): widget-utils.js, TF.js, numeric.js, Chart.js
-// KaTeX is used if available globally (renderMathInElement / katex).
+// Requires (loaded first): widget-utils.js, Chart.js
+// KaTeX is used if available globally.
 // ============================================================================
 
 function createLinearNonlinearWidget(containerId, opts) {
   opts = opts || {};
 
-  // ── Preset definitions ────────────────────────────────────────────────────
-
-  const NUM_DATA = 64;
+  // ── Preset metadata ───────────────────────────────────────────────────────
 
   const PRESETS = {
     depth1: {
-      column: 'linear', depthLabel: 'depth = 1',
-      name: 'Linear Regression', desc: 'exponential loss decay',
-      dims: [6, 6], lr: 0.01, initScale: 0.05,
+      group: 'linear', name: 'Linear Regression', depthLabel: 'd = 1',
       eq: '$\\hat{f}(x) = W_1 x$',
     },
     depth2: {
-      column: 'linear', depthLabel: 'depth = 2',
-      name: 'Minimally Deep', desc: 'analytically tractable',
-      dims: [6, 6, 6], lr: 0.005, initScale: 0.01,
+      group: 'linear', name: 'Minimally Deep', depthLabel: 'd = 2',
       eq: '$\\hat{f}(x) = W_2 W_1 x$',
     },
     depth3: {
-      column: 'linear', depthLabel: 'depth = 3',
-      name: 'Deep Linear', desc: 'stepwise decrease in loss',
-      dims: [6, 6, 6, 6], lr: 0.005, initScale: 0.01,
+      group: 'linear', name: 'Deep Linear', depthLabel: 'd = 3',
       eq: '$\\hat{f}(x) = W_3 W_2 W_1 x$',
     },
     relu_shallow: {
-      column: 'nonlinear', depthLabel: 'depth = 2',
-      name: 'Shallow ReLU', desc: 'piecewise linear',
-      dims: [6, 6, 6], lr: 0.005, initScale: 0.01,
-      activation: 'relu', useTeacher: true,
+      group: 'nonlinear', name: 'Shallow ReLU', depthLabel: 'd = 2',
       eq: '$\\hat{f}(x) = W_2\\,\\text{ReLU}(W_1 x)$',
     },
     relu_deep: {
-      column: 'nonlinear', depthLabel: 'depth = 3',
-      name: 'Deep ReLU', desc: 'piecewise linear',
-      dims: [6, 6, 6, 6], lr: 0.005, initScale: 0.01,
-      activation: 'relu', useTeacher: true,
+      group: 'nonlinear', name: 'Deep ReLU', depthLabel: 'd = 3',
       eq: '$\\hat{f}(x) = W_3\\,\\text{ReLU}(W_2\\,\\text{ReLU}(W_1 x))$',
     },
     tanh: {
-      column: 'nonlinear', depthLabel: 'depth = 3',
-      name: 'Deep tanh', desc: 'smoothly saturating',
-      dims: [6, 6, 6, 6], lr: 0.005, initScale: 0.01,
-      activation: 'tanh', useTeacher: true,
+      group: 'nonlinear', name: 'Deep tanh', depthLabel: 'd = 3',
       eq: '$\\hat{f}(x) = W_3\\,\\tanh(W_2\\,\\tanh(W_1 x))$',
     },
   };
@@ -63,52 +59,35 @@ function createLinearNonlinearWidget(containerId, opts) {
   const LINEAR_KEYS    = ['depth1', 'depth2', 'depth3'];
   const NONLINEAR_KEYS = ['relu_shallow', 'relu_deep', 'tanh'];
 
+  // Animation plays through the data over this many milliseconds
+  const PLAY_DURATION_MS = 7000;
+
   // ── State ─────────────────────────────────────────────────────────────────
 
-  const STEPS_PER_FRAME = 20;
-  const SV_RECORD_EVERY = 40;
-  const MAX_ITERS       = 80000;
-
-  let activeKey    = opts.defaultPreset || 'tanh';
-  let weightVars   = [];
-  let teacherVars  = [];
-  let targetMatrix = null;
-  let inputData    = null;
-  let targetData   = null;
-  let lossHistory  = [];
-  let svHistory    = [];   // SVs of first weight matrix W_1
-  let iterCount    = 0;
-  let isRunning    = false;
-  let animFrameId  = null;
-  let completed    = false;
-  let stopAt       = null;
-  let stopAtWall   = null;
-
-  // current preset config (copied from PRESETS[activeKey])
-  let dims       = null;
-  let lr         = null;
-  let initScale  = null;
-  let activation = null;
-  let useTeacher = false;
+  let activeKey      = opts.defaultPreset || 'depth3';
+  let data           = null;   // full JSON payload after load
+  let playIdx        = 0;
+  let maxIdx         = 0;
+  let isPlaying      = false;
+  let animFrameId    = null;
+  let playStartTime  = null;
+  let playStartIdx   = 0;
 
   let lossChart = null;
   let svChart   = null;
-  let uid       = dlnUID();
+  const uid     = dlnUID();
   let root      = null;
+  let playBtn   = null;
+  let slider    = null;
 
   // ── DOM ───────────────────────────────────────────────────────────────────
 
-  function _cardHTML(key) {
+  function _itemHTML(key) {
     const p = PRESETS[key];
     return `
-      <button class="dln-preset-card${key === activeKey ? ' active' : ''}" data-preset="${key}">
-        <div class="dln-preset-header">
-          <span class="dln-preset-depth">${p.depthLabel}</span>
-          <span class="dln-preset-icon">&#9654;</span>
-        </div>
-        <div class="dln-preset-name">${p.name}</div>
-        <div class="dln-preset-desc">${p.desc}</div>
-        <span class="dln-preset-reset" style="display:none">&#8635;</span>
+      <button class="dln-preset-item${key === activeKey ? ' active' : ''}" data-preset="${key}">
+        <span class="dln-preset-item-name">${p.name}</span>
+        <span class="dln-preset-item-depth">${p.depthLabel}</span>
       </button>`;
   }
 
@@ -119,51 +98,62 @@ function createLinearNonlinearWidget(containerId, opts) {
 
     root.innerHTML = `
       <div class="dln-ln-columns">
+
         <div class="dln-preset-col">
-          <div class="dln-preset-col-label">linear</div>
-          ${LINEAR_KEYS.map(_cardHTML).join('')}
+          <div class="dln-preset-col-label">Linear</div>
+          ${LINEAR_KEYS.map(_itemHTML).join('')}
         </div>
+
         <div class="dln-ln-center">
+          <div id="${uid}-status" class="dln-status-text" style="min-height:1.2em;margin-bottom:4px;"></div>
           <div class="dln-ln-charts">
             <div class="dln-ln-chart-section">
-              <div class="dln-ln-chart-title">loss</div>
+              <div class="dln-chart-title">loss</div>
               <div class="dln-chart-wrap"><canvas id="${uid}-loss"></canvas></div>
             </div>
             <div class="dln-ln-chart-section">
-              <div class="dln-ln-chart-title">singular values of $W_1$</div>
+              <div class="dln-chart-title">singular values of $W_1$</div>
               <div class="dln-chart-wrap"><canvas id="${uid}-sv"></canvas></div>
             </div>
           </div>
+          <div class="dln-ln-playbar">
+            <button class="dln-btn dln-play-btn" id="${uid}-play" disabled>&#9654; Play</button>
+            <input type="range" class="dln-slider" id="${uid}-slider"
+                   min="0" max="100" value="100" step="1" disabled>
+          </div>
           <div id="${uid}-eq" class="dln-ln-eq"></div>
         </div>
+
         <div class="dln-preset-col">
-          <div class="dln-preset-col-label">nonlinear</div>
-          ${NONLINEAR_KEYS.map(_cardHTML).join('')}
+          <div class="dln-preset-col-label">Nonlinear</div>
+          ${NONLINEAR_KEYS.map(_itemHTML).join('')}
         </div>
+
       </div>`;
 
-    // Wire preset cards
-    root.querySelectorAll('.dln-preset-card').forEach(btn => {
-      btn.addEventListener('click', e => {
-        // If clicking the reset icon inside, reset+replay
-        if (e.target.classList.contains('dln-preset-reset')) {
-          e.stopPropagation();
-          _applyPreset(btn.dataset.preset);
-          _start();
-          return;
-        }
-        const key = btn.dataset.preset;
-        if (key === activeKey) {
-          if (completed) { _reset(); _start(); }
-          else           { isRunning ? _pause() : _start(); }
-        } else {
-          _applyPreset(key);
-          _start();
-        }
-      });
+    playBtn = root.querySelector(`#${uid}-play`);
+    slider  = root.querySelector(`#${uid}-slider`);
+
+    root.querySelectorAll('.dln-preset-item').forEach(btn => {
+      btn.addEventListener('click', () => _selectPreset(btn.dataset.preset));
     });
 
-    // Render math in eq display if KaTeX available
+    playBtn.addEventListener('click', () => {
+      if (isPlaying) {
+        _stopPlay();
+      } else {
+        if (playIdx >= maxIdx) playIdx = 0; // replay from start when done
+        _startPlay();
+      }
+    });
+
+    slider.addEventListener('input', () => {
+      if (isPlaying) _stopPlay();
+      playIdx = parseInt(slider.value, 10);
+      _renderAtIdx();
+      _syncPlayBtn();
+    });
+
     _renderEq(activeKey);
   }
 
@@ -175,7 +165,9 @@ function createLinearNonlinearWidget(containerId, opts) {
     if (typeof renderMathInElement !== 'undefined' && typeof KATEX_OPTS !== 'undefined') {
       renderMathInElement(el, KATEX_OPTS);
     } else if (typeof katex !== 'undefined') {
-      try { el.innerHTML = katex.renderToString(eq.replace(/^\$|\$$/g, ''), { throwOnError: false }); } catch (_) {}
+      try {
+        el.innerHTML = katex.renderToString(eq.replace(/^\$|\$$/g, ''), { throwOnError: false });
+      } catch (_) {}
     }
   }
 
@@ -194,8 +186,8 @@ function createLinearNonlinearWidget(containerId, opts) {
       data: {
         labels: [],
         datasets: [{
-          data: [],
-          borderColor: '#0969da', backgroundColor: 'rgba(9,105,218,0.06)',
+          data: [], borderColor: '#0969da',
+          backgroundColor: 'rgba(9,105,218,0.05)',
           borderWidth: 1.5, pointRadius: 0, tension: 0, fill: true,
         }],
       },
@@ -209,244 +201,156 @@ function createLinearNonlinearWidget(containerId, opts) {
     });
   }
 
-  function _updateCharts() {
-    if (lossChart && lossHistory.length > 0) {
-      const pts = dlnDownsample(lossHistory, 300);
-      lossChart.data.labels           = pts.map(p => p.iter);
-      lossChart.data.datasets[0].data = pts.map(p => p.loss);
-      lossChart.update('none');
-    }
+  // Render charts up to (and including) playIdx in the current preset's data
+  function _renderAtIdx() {
+    if (!data || !data[activeKey]) return;
+    const preset = data[activeKey];
+    const end    = Math.min(playIdx, preset.loss.length - 1);
 
-    if (svChart && svHistory.length > 0) {
-      const pts    = dlnDownsample(svHistory, 300);
-      const numSVs = pts[pts.length - 1].svs.length;
-      if (svChart.data.datasets.length !== numSVs) {
-        svChart.data.datasets = [];
-        for (let i = 0; i < numSVs; i++) {
-          svChart.data.datasets.push({
-            data: [], borderColor: DLN_SV_COLORS[i % DLN_SV_COLORS.length],
-            backgroundColor: 'transparent', borderWidth: 2,
-            pointRadius: 0, tension: 0,
-          });
-        }
-      }
-      svChart.data.labels = pts.map(p => p.iter);
-      for (let i = 0; i < numSVs; i++) {
-        svChart.data.datasets[i].data = pts.map(p => p.svs[i] ?? 0);
-      }
-      svChart.update('none');
-    }
-  }
-
-  function _clearCharts() {
+    // Loss chart
     if (lossChart) {
-      lossChart.data.labels           = [];
-      lossChart.data.datasets[0].data = [];
+      const slice = preset.loss.slice(0, end + 1);
+      lossChart.data.labels           = slice.map(p => p.iter);
+      lossChart.data.datasets[0].data = slice.map(p => p.loss);
       lossChart.update('none');
     }
+
+    // SV chart
     if (svChart) {
-      svChart.data.labels   = [];
-      svChart.data.datasets = [];
+      const svSlice = preset.svs.slice(0, end + 1);
+      if (svSlice.length > 0) {
+        const numSVs = svSlice[svSlice.length - 1].svs.length;
+        if (svChart.data.datasets.length !== numSVs) {
+          svChart.data.datasets = Array.from({ length: numSVs }, (_, i) => ({
+            data: [], borderColor: DLN_SV_COLORS[i % DLN_SV_COLORS.length],
+            backgroundColor: 'transparent', borderWidth: 1.8,
+            pointRadius: 0, tension: 0,
+          }));
+        }
+        svChart.data.labels = svSlice.map(p => p.iter);
+        for (let i = 0; i < numSVs; i++) {
+          svChart.data.datasets[i].data = svSlice.map(p => p.svs[i] ?? 0);
+        }
+      } else {
+        svChart.data.labels   = [];
+        svChart.data.datasets = [];
+      }
       svChart.update('none');
     }
+
+    // Sync slider thumb position
+    if (slider) slider.value = end;
   }
 
-  // ── Simulation ────────────────────────────────────────────────────────────
+  // ── Preset selection ──────────────────────────────────────────────────────
 
-  function _initSim() {
-    weightVars.forEach(v => { try { v.dispose(); } catch (_) {} });
-    teacherVars.forEach(v => { try { v.dispose(); } catch (_) {} });
-    if (targetMatrix) { try { targetMatrix.dispose(); } catch (_) {} }
-    if (inputData)    { try { inputData.dispose();    } catch (_) {} }
-    if (targetData)   { try { targetData.dispose();   } catch (_) {} }
+  function _selectPreset(key) {
+    _stopPlay();
+    activeKey = key;
 
-    weightVars  = [];
-    teacherVars = [];
-    targetMatrix = inputData = targetData = null;
-    lossHistory  = [];
-    svHistory    = [];
-    iterCount    = 0;
-    stopAt       = null;
-    stopAtWall   = null;
-    completed    = false;
-
-    const depth = dims.length - 1;
-    const inDim = dims[0];
-
-    for (let i = 0; i < depth; i++) {
-      const [r, c] = [dims[i + 1], dims[i]];
-      const init = tf.randomNormal([r, c], 0, initScale);
-      weightVars.push(tf.variable(init));
-      init.dispose();
-    }
-
-    // Fixed target matrix (diagonal, SVs in (0,1))
-    const n = Math.min(dims[dims.length - 1], dims[0]);
-    const dv = tf.tensor1d(Array.from({ length: n }, (_, i) => (n - i) / (n + 1)));
-    targetMatrix = tf.pad(tf.diag(dv), [[0, dims[dims.length-1]-n], [0, dims[0]-n]]);
-    dv.dispose();
-
-    // Fixed dataset
-    inputData = tf.randomNormal([inDim, NUM_DATA]);
-
-    if (useTeacher) {
-      // Teacher network with same architecture
-      const act = _actFn(activation);
-      for (let i = 0; i < depth; i++) {
-        const [r, c] = [dims[i + 1], dims[i]];
-        teacherVars.push(tf.mul(tf.randomNormal([r, c]), 1 / Math.sqrt(c)));
-      }
-      targetData = tf.tidy(() => {
-        let h = tf.matMul(teacherVars[0], inputData);
-        for (let i = 1; i < teacherVars.length; i++) {
-          h = act(h);
-          h = tf.matMul(teacherVars[i], h);
-        }
-        return h;
-      });
-    } else {
-      targetData = tf.matMul(targetMatrix, inputData);
-    }
-  }
-
-  function _actFn(key) {
-    return key === 'relu'    ? tf.relu
-         : key === 'tanh'    ? tf.tanh
-         : key === 'sigmoid' ? tf.sigmoid
-         : key === 'sin'     ? tf.sin
-         : (x => x); // identity / linear
-  }
-
-  function _forward(X) {
-    if (!activation) {
-      let p = tf.matMul(weightVars[0], X);
-      for (let i = 1; i < weightVars.length; i++) p = tf.matMul(weightVars[i], p);
-      return p;
-    }
-    const act = _actFn(activation);
-    let h = tf.matMul(weightVars[0], X);
-    for (let i = 1; i < weightVars.length; i++) { h = act(h); h = tf.matMul(weightVars[i], h); }
-    return h;
-  }
-
-  function _step() {
-    tf.tidy(() => {
-      const result = tf.variableGrads(() => {
-        const pred = _forward(inputData);
-        return tf.div(tf.sum(tf.square(tf.sub(pred, targetData))), NUM_DATA);
-      });
-      weightVars.forEach(v => {
-        const g = result.grads[v.name];
-        if (g) v.assign(tf.sub(v, tf.mul(g, lr)));
-      });
-    });
-  }
-
-  function _getLoss() {
-    return tf.tidy(() => {
-      const pred = _forward(inputData);
-      return tf.div(tf.sum(tf.square(tf.sub(pred, targetData))), NUM_DATA).dataSync()[0];
-    });
-  }
-
-  function _recordSVs() {
-    // Record SVs of first weight matrix W_1
-    const svs = tf.tidy(() => dlnComputeSVs(weightVars[0]));
-    svHistory.push({ iter: iterCount, svs });
-  }
-
-  function _checkStop(loss) {
-    if (iterCount > MAX_ITERS) { _finish(); return true; }
-    if (stopAt === null && loss < 0.05) {
-      stopAt     = iterCount * 3;
-      stopAtWall = performance.now();
-    }
-    if (stopAt !== null && iterCount >= stopAt &&
-        (performance.now() - stopAtWall) >= 10000) {
-      _finish(); return true;
-    }
-    return false;
-  }
-
-  function _finish() {
-    _updateCharts();
-    completed = true;
-    _pause();
-    _syncCards();
-  }
-
-  function _loop() {
-    if (!isRunning) return;
-    for (let i = 0; i < STEPS_PER_FRAME; i++) { _step(); iterCount++; }
-    const loss = _getLoss();
-    lossHistory.push({ iter: iterCount, loss });
-    if (iterCount % SV_RECORD_EVERY === 0) _recordSVs();
-    _updateCharts();
-    if (_checkStop(loss)) return;
-    animFrameId = requestAnimationFrame(_loop);
-  }
-
-  // ── Preset / Controls ──────────────────────────────────────────────────────
-
-  function _applyPreset(key) {
-    const p = PRESETS[key];
-    if (!p) return;
-    activeKey  = key;
-    dims       = p.dims.slice();
-    lr         = p.lr;
-    initScale  = p.initScale;
-    activation = p.activation || null;
-    useTeacher = p.useTeacher || false;
-    root.querySelectorAll('.dln-preset-card').forEach(btn => {
+    root.querySelectorAll('.dln-preset-item').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.preset === key);
     });
     _renderEq(key);
-    _reset();
+
+    if (data && data[key]) {
+      maxIdx   = data[key].loss.length - 1;
+      playIdx  = maxIdx;  // show full data immediately
+      if (slider) { slider.max = maxIdx; slider.value = maxIdx; }
+      _renderAtIdx();
+    }
   }
 
-  function _syncCards() {
-    // Update play icons
-    root.querySelectorAll('.dln-preset-card').forEach(btn => {
-      const icon  = btn.querySelector('.dln-preset-icon');
-      const reset = btn.querySelector('.dln-preset-reset');
-      if (!icon) return;
-      if (btn.dataset.preset === activeKey) {
-        icon.innerHTML = completed ? '&#8635;' : isRunning ? '&#9646;&#9646;' : '&#9654;';
-        if (reset) reset.style.display = (!completed && !isRunning) ? '' : 'none';
-      } else {
-        icon.innerHTML = '&#9654;';
-        if (reset) reset.style.display = 'none';
-      }
-    });
+  // ── Playback ──────────────────────────────────────────────────────────────
+
+  function _startPlay() {
+    if (isPlaying || !data || !data[activeKey]) return;
+    WidgetManager.requestStart(uid);
+    isPlaying     = true;
+    playStartIdx  = playIdx;
+    playStartTime = null;
+    animFrameId   = requestAnimationFrame(_playLoop);
+    _syncPlayBtn();
   }
 
-  function _start() {
-    if (isRunning) return;
-    if (weightVars.length === 0) _initSim();
-    isRunning = true;
-    _syncCards();
-    _loop();
+  function _playLoop(timestamp) {
+    if (!isPlaying) return;
+    if (playStartTime === null) playStartTime = timestamp;
+
+    const fraction = Math.min((timestamp - playStartTime) / PLAY_DURATION_MS, 1);
+    playIdx = Math.round(playStartIdx + fraction * (maxIdx - playStartIdx));
+    _renderAtIdx();
+
+    if (fraction >= 1) {
+      _stopPlay();
+      return;
+    }
+    animFrameId = requestAnimationFrame(_playLoop);
   }
 
-  function _pause() {
-    isRunning = false;
+  function _stopPlay() {
+    if (!isPlaying && animFrameId === null) return;
+    isPlaying = false;
     if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
-    _syncCards();
+    WidgetManager.notifyStop(uid);
+    _syncPlayBtn();
   }
 
-  function _reset() {
-    _pause();
-    _initSim();
-    _clearCharts();
-    _syncCards();
+  function _syncPlayBtn() {
+    if (!playBtn) return;
+    if (isPlaying) {
+      playBtn.innerHTML = '&#9646;&#9646; Pause';
+    } else if (playIdx >= maxIdx && maxIdx > 0) {
+      playBtn.innerHTML = '&#8635; Replay';
+    } else {
+      playBtn.innerHTML = '&#9654; Play';
+    }
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  function _setStatus(msg) {
+    const el = document.getElementById(`${uid}-status`);
+    if (el) el.textContent = msg;
+  }
+
+  async function loadData() {
+    const dataUrl = opts.dataUrl || 'linear_nonlinear_data.json';
+    _setStatus('Loading data\u2026');
+    try {
+      const res = await fetch(dataUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      data = await res.json();
+      _setStatus('');
+
+      // Enable controls
+      if (playBtn) playBtn.disabled = false;
+      if (slider)  slider.disabled  = false;
+
+      // Show the default preset
+      _selectPreset(activeKey);
+
+    } catch (err) {
+      console.error('LinearNonlinearWidget: failed to load data:', err);
+      _setStatus('Error loading data.');
+    }
+  }
+
+  // ── Scroll autoplay ───────────────────────────────────────────────────────
+
+  function _autoplayStart() {
+    if (!data) return; // data not yet loaded; loadData will check pendingAutoplay
+    playIdx = 0;
+    _renderAtIdx();
+    _startPlay();
   }
 
   // ── Bootstrap ─────────────────────────────────────────────────────────────
 
   buildDOM();
   _initCharts();
-  _applyPreset(activeKey);
-  if (opts.autoStart !== false) _start();
-
-  return { start: _start, pause: _pause, reset: _reset };
+  WidgetManager.register(uid, _stopPlay);
+  loadData().then(() => {
+    dlnScrollAutoplay(root, _autoplayStart);
+  });
 }

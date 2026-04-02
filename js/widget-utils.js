@@ -11,6 +11,32 @@ const DLN_SV_COLORS = [
   '#6e40c9', '#953800',
 ];
 
+// ── Single-active compute manager ────────────────────────────────────────────
+//
+// Only one widget may be running at a time.  Call WidgetManager.register(uid,
+// pauseFn) at widget bootstrap, then WidgetManager.requestStart(uid) at the
+// top of each widget's _start() function.
+
+const WidgetManager = (() => {
+  const registry = {};   // uid → pauseFn
+  let activeId   = null;
+
+  return {
+    register(uid, pauseFn) {
+      registry[uid] = pauseFn;
+    },
+    requestStart(uid) {
+      if (activeId && activeId !== uid && registry[activeId]) {
+        registry[activeId]();  // pause the currently active widget
+      }
+      activeId = uid;
+    },
+    notifyStop(uid) {
+      if (activeId === uid) activeId = null;
+    },
+  };
+})();
+
 // ── SVD via numeric.js ────────────────────────────────────────────────────────
 
 function dlnComputeSVs(t) {
@@ -128,6 +154,7 @@ function dlnAlignedInit(weightVars, dims, targetMatrix, initScale) {
 }
 
 // ── Chart options ─────────────────────────────────────────────────────────────
+// Distill.pub style: subdued gridlines, clean axes, no legend.
 
 function dlnChartOptions(xLabel, yLabel, extra) {
   return Object.assign({
@@ -136,21 +163,41 @@ function dlnChartOptions(xLabel, yLabel, extra) {
     animation: false,
     scales: {
       x: {
-        title: { display: !!xLabel, text: xLabel || '', color: '#57606a', font: { size: 10 } },
-        ticks: { color: '#888', maxTicksLimit: 5, maxRotation: 0, font: { size: 9 } },
-        grid:  { color: '#eaeef2' },
-        border:{ color: '#d0d7de' },
+        title: { display: !!xLabel, text: xLabel || '', color: '#8c959f', font: { size: 10 } },
+        ticks: { color: '#8c959f', maxTicksLimit: 5, maxRotation: 0, font: { size: 9 } },
+        grid:  { color: 'rgba(0,0,0,0.05)', lineWidth: 1 },
+        border:{ color: '#d0d7de', dash: [] },
       },
       y: {
-        title: { display: !!yLabel, text: yLabel || '', color: '#57606a', font: { size: 10 } },
-        ticks: { color: '#888', font: { size: 9 } },
-        grid:  { color: '#eaeef2' },
-        border:{ color: '#d0d7de' },
+        title: { display: !!yLabel, text: yLabel || '', color: '#8c959f', font: { size: 10 } },
+        ticks: { color: '#8c959f', font: { size: 9 } },
+        grid:  { color: 'rgba(0,0,0,0.05)', lineWidth: 1 },
+        border:{ color: '#d0d7de', dash: [] },
         beginAtZero: true,
       },
     },
     plugins: { legend: { display: false } },
   }, extra || {});
+}
+
+// ── Scroll-triggered autoplay ─────────────────────────────────────────────────
+//
+// Calls startFn() the first time `element` is at least `threshold` visible
+// in the viewport.  Uses IntersectionObserver (no-op in environments without it).
+// Returns the observer so callers can disconnect it if needed.
+
+function dlnScrollAutoplay(element, startFn, threshold) {
+  threshold = threshold === undefined ? 0.55 : threshold;
+  if (!element || typeof IntersectionObserver === 'undefined') return null;
+  let triggered = false;
+  const obs = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting && !triggered) {
+      triggered = true;
+      startFn();
+    }
+  }, { threshold });
+  obs.observe(element);
+  return obs;
 }
 
 // ── Tiny UID for unique canvas IDs ────────────────────────────────────────────

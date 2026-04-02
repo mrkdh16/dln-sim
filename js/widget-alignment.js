@@ -1,60 +1,47 @@
 // ============================================================================
-// WIDGET: STRONG ALIGNMENT (Pre-computed / Scrubbable)
+// WIDGET: STRONG ALIGNMENT (Data-Driven / Logarithmic / RdBu)
 // ============================================================================
 
-function createAlignmentWidget(containerId, opts) {
-  opts = opts || {};
-
-  // ── Regime definitions ────────────────────────────────────────────────────
+function createAlignmentWidget(containerId, dataUrl) {
   const REGIMES = [
-    { key: 'lazy', label: 'lazy',   sub: 'σ₀ = 2.0, η = 0.01',   initScale: 2.0,   lr: 0.01,  color: '#d1242f' },
-    { key: 'mid',  label: 'middle', sub: 'σ₀ = 0.3, η = 0.01',   initScale: 0.3,   lr: 0.01,  color: '#8250df' },
-    { key: 'rich', label: 'rich',   sub: 'σ₀ = 0.005, η = 0.001', initScale: 0.005, lr: 0.001, color: '#0969da' },
+    { key: 'unbalanced', label: 'unbalanced',   sub: 'σ₀ = 2.0, η = 0.01',   color: '#d1242f' },
+    { key: 'mid',  label: 'middle', sub: 'σ₀ = 0.08, η = 0.01',   color: '#8250df' },
+    { key: 'balanced', label: 'balanced',   sub: 'σ₀ = 0.005, η = 0.001', color: '#0969da' },
   ];
 
   const MAT_LABELS = ['U₂ᵀU', 'V₁ᵀV', 'V₂ᵀU₁'];
+  const DIMS = 6;
+  const SLIDER_RES     = 1000;  // slider resolution
+  const PLAY_DURATION_MS = 10000; // ms to animate from current pos to end
 
-  // ── Simulation constants ──────────────────────────────────────────────────
-  const DEPTH           = 2;
-  const DIMS            = 6;
-  const MAX_ITERS       = 25000;
-  const RECORD_EVERY    = 100;   // snapshot interval (iterations)
-  const CHUNK_SIZE      = 100;   // Gradient steps per UI yield
+  let snapshots = [];
+  let lossChart = null;
+  let uid = dlnUID();
+  let root, sliderEl, iterLabel, statusEl, playBtn;
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  let regStates = REGIMES.map(r => ({
-    cfg:         r,
-    weightVars:  [],
-    targetMatrix: null,
-    lossHistory: [],
-    iterCount:   0,
-  }));
-
-  let snapshots    = [];
-  let currentSnap  = 0;
-  let isComputing  = false;
-  let simDone      = false;
-
-  let lossChart    = null;
-  let uid          = dlnUID();
-  let root, sliderEl, iterLabel, statusEl;
+  // ── Playback state ────────────────────────────────────────────────────────
+  let isPlaying     = false;
+  let animFrameId   = null;
+  let playStartTime = null;
+  let playStartVal  = 0;
 
   // ── DOM ───────────────────────────────────────────────────────────────────
+
   function buildDOM() {
     root = document.getElementById(containerId);
-    if (!root) { console.error('AlignmentWidget: container not found:', containerId); return; }
+    if (!root) return;
     root.classList.add('dln-widget');
 
     const colHeaders = REGIMES.map(r => `
       <div class="dln-align-col-hdr">
         <div class="dln-align-col-name" style="color:${r.color}">${r.label}</div>
-        <div class="dln-align-col-sub">${r.sub}</div>
+        <div class="dln-align-col-sub" style="font-size: 10px;">${r.sub}</div>
       </div>`).join('');
 
     const hmRows = MAT_LABELS.map((label, row) => `
-      <div class="dln-align-hm-row">
-        <div class="dln-align-row-label">${label}</div>
-        ${REGIMES.map((r, col) => `<div id="${uid}-hm-${row}-${col}" class="dln-align-hm-cell"></div>`).join('')}
+      <div class="dln-align-hm-row" style="align-items: center;">
+        <div class="dln-align-row-label" style="width: 40px; text-align: right; margin-right: 10px;">${label}</div>
+        ${REGIMES.map((r, col) => `<div id="${uid}-hm-${row}-${col}" class="dln-align-hm-cell" style="width: 100px; height: 100px;"></div>`).join('')}
       </div>`).join('');
 
     const legendSpans = REGIMES.map(r =>
@@ -63,15 +50,15 @@ function createAlignmentWidget(containerId, opts) {
     ).join('');
 
     root.innerHTML = `
-      <div class="dln-widget-controls" style="display: flex; justify-content: space-between; align-items: center;">
-        <button class="dln-btn dln-reset-btn">&#8635; recompute</button>
-        <span class="dln-status-text" style="font-size: 12px; color: #666;"></span>
+      <div class="dln-widget-controls" style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="dln-status-text" style="font-size:12px;color:#8c959f;">Loading data…</span>
+        <button class="dln-btn dln-play-btn" id="${uid}-play" disabled>&#9654; Play</button>
       </div>
 
       <div class="dln-align-top">
         <div class="dln-align-loss-block">
           <div class="dln-ln-chart-title" style="display:flex;gap:10px;align-items:center">
-            <span>loss</span>${legendSpans}
+            <span>loss (log-log)</span>${legendSpans}
           </div>
           <div class="dln-chart-wrap" style="height:160px">
             <canvas id="${uid}-loss"></canvas>
@@ -79,34 +66,52 @@ function createAlignmentWidget(containerId, opts) {
         </div>
       </div>
 
-      <div class="dln-align-slider-row" style="margin-top: 15px; display: flex; align-items: center; gap: 10px;">
+      <div class="dln-align-slider-row" style="margin-top:15px;display:flex;align-items:center;gap:10px;">
         <span class="dln-ctrl-label">time</span>
-        <input type="range" class="dln-slider" style="flex:1" min="0" max="0" value="0" disabled>
-        <span class="dln-align-iter-label" style="min-width: 60px; text-align: right;">step 0</span>
+        <input type="range" class="dln-slider" style="flex:1" min="0" max="${SLIDER_RES}" value="0" disabled>
+        <span class="dln-align-iter-label" style="min-width:60px;text-align:right;font-variant-numeric:tabular-nums;">step 0</span>
       </div>
 
-      <div class="dln-align-hm-section">
+      <div class="dln-align-hm-section" style="max-width:400px;margin:15px auto 0 auto;">
         <div class="dln-align-col-hdrs">
-          <div></div>${colHeaders}
+          <div style="width:40px;margin-right:10px;"></div>${colHeaders}
         </div>
         ${hmRows}
+      </div>
+
+      <div class="dln-heatmap-legend" style="display:flex;align-items:center;justify-content:center;margin-top:15px;font-size:11px;color:#8c959f;">
+        <span>-1</span>
+        <div style="width:120px;height:8px;margin:0 10px;background:linear-gradient(to right,#b2182b,#f7f7f7,#2166ac);border-radius:4px;border:1px solid #ddd;"></div>
+        <span>+1</span>
       </div>`;
 
+    playBtn   = root.querySelector(`#${uid}-play`);
     sliderEl  = root.querySelector('input[type=range]');
     statusEl  = root.querySelector('.dln-status-text');
     iterLabel = root.querySelector('.dln-align-iter-label');
 
+    // Slider scrub — pause playback if dragged manually
     sliderEl.addEventListener('input', () => {
-      currentSnap = parseInt(sliderEl.value);
-      renderSnapshot(currentSnap);
+      if (isPlaying) _stopPlay();
+      _renderFromSlider();
     });
 
-    root.querySelector('.dln-reset-btn').addEventListener('click', () => {
-      if (!isComputing) _resetAndCompute();
+    playBtn.addEventListener('click', () => {
+      if (isPlaying) {
+        _stopPlay();
+      } else {
+        // Restart from beginning if already at the end
+        if (parseInt(sliderEl.value, 10) >= SLIDER_RES) {
+          sliderEl.value = 0;
+          _renderFromSlider();
+        }
+        _startPlay();
+      }
     });
   }
 
-  // ── Loss chart ─────────────────────────────────────────────────────────────
+  // ── Loss chart ────────────────────────────────────────────────────────────
+
   function initChart() {
     const el = document.getElementById(`${uid}-loss`);
     if (!el) return;
@@ -121,7 +126,7 @@ function createAlignmentWidget(containerId, opts) {
           })),
           {
             label: '_indicator', data: [],
-            borderColor: 'rgba(0,0,0,0.35)', backgroundColor: 'transparent',
+            borderColor: 'rgba(0,0,0,0.3)', backgroundColor: 'transparent',
             borderWidth: 1, pointRadius: 0, tension: 0,
             borderDash: [4, 3], parsing: false,
           },
@@ -130,42 +135,55 @@ function createAlignmentWidget(containerId, opts) {
       options: {
         responsive: true, maintainAspectRatio: false, animation: false,
         scales: {
-          x: { type: 'linear', ticks: { color: '#888', maxTicksLimit: 5 }, grid: { color: '#eaeef2' } },
-          y: { type: 'logarithmic', ticks: { color: '#888', callback: v => v >= 0.01 ? v.toFixed(2) : v.toExponential(0) }, grid: { color: '#eaeef2' } },
+          x: {
+            type: 'logarithmic', min: 1,
+            ticks: { color: '#8c959f', maxTicksLimit: 6,
+                     callback: v => v >= 1000 ? (v / 1000) + 'k' : v },
+            grid: { color: 'rgba(0,0,0,0.05)' },
+          },
+          y: {
+            type: 'logarithmic',
+            ticks: { color: '#8c959f', callback: v => v >= 0.01 ? v.toFixed(2) : v.toExponential(0) },
+            grid: { color: 'rgba(0,0,0,0.05)' },
+          },
         },
         plugins: { legend: { display: false } },
       },
     });
   }
 
-  function updateLossChart() {
-    if (!lossChart) return;
+  function populateLossChart() {
+    if (!lossChart || snapshots.length === 0) return;
+    const pts = dlnDownsample(snapshots, 400);
     REGIMES.forEach((r, ri) => {
-      const pts = dlnDownsample(regStates[ri].lossHistory, 400);
-      lossChart.data.datasets[ri].data = pts.map(p => ({ x: p.iter, y: Math.max(p.loss, 1e-8) }));
+      lossChart.data.datasets[ri].data = pts.map(snap => ({
+        x: snap.iter === 0 ? 1 : snap.iter,
+        y: Math.max(snap.loss[ri], 1e-8),
+      }));
     });
     lossChart.update('none');
   }
 
   function updateIndicator(iter) {
-    if (!lossChart) return;
+    if (!lossChart || snapshots.length === 0) return;
     let yMin = Infinity, yMax = -Infinity;
-    REGIMES.forEach((r, ri) => {
-      const h = regStates[ri].lossHistory;
-      if (h.length > 0) {
-        yMin = Math.min(yMin, Math.min(...h.map(p => p.loss)));
-        yMax = Math.max(yMax, h[0].loss);
-      }
+    snapshots.forEach(snap => {
+      snap.loss.forEach(l => {
+        if (l < yMin) yMin = l;
+        if (l > yMax) yMax = l;
+      });
     });
+    const safeIter = iter === 0 ? 1 : iter;
     lossChart.data.datasets[3].data = [
-      { x: iter, y: Math.max(yMin * 0.5, 1e-9) },
-      { x: iter, y: yMax * 2 },
+      { x: safeIter, y: Math.max(yMin * 0.5, 1e-9) },
+      { x: safeIter, y: yMax * 2 },
     ];
     lossChart.update('none');
   }
 
-  // ── Plotly heatmaps ────────────────────────────────────────────────────────
-  const HM_COLORSCALE = 'Blues';
+  // ── Heatmaps ──────────────────────────────────────────────────────────────
+
+  const HM_COLORSCALE = 'RdBu';
   const HM_LAYOUT = {
     margin: { t: 0, b: 0, l: 0, r: 0 },
     paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
@@ -174,7 +192,9 @@ function createAlignmentWidget(containerId, opts) {
   };
   const HM_CONFIG = { responsive: true, displayModeBar: false, staticPlot: true };
 
-  function emptyZ() { return Array.from({ length: DIMS }, () => Array(DIMS).fill(0)); }
+  function emptyZ() {
+    return Array.from({ length: DIMS }, () => Array(DIMS).fill(0));
+  }
 
   function initHeatmaps() {
     if (typeof Plotly === 'undefined') return;
@@ -183,7 +203,12 @@ function createAlignmentWidget(containerId, opts) {
         const divId = `${uid}-hm-${row}-${col}`;
         const el = document.getElementById(divId);
         if (!el) continue;
-        Plotly.newPlot(divId, [{ type: 'heatmap', z: emptyZ(), zmin: 0, zmax: 1, colorscale: HM_COLORSCALE, showscale: false, xgap: 1, ygap: 1 }], HM_LAYOUT, HM_CONFIG);
+        Plotly.newPlot(divId, [{
+          type: 'heatmap', z: emptyZ(),
+          zmin: -1, zmax: 1,
+          colorscale: HM_COLORSCALE, reversescale: true,
+          showscale: false, xgap: 1, ygap: 1,
+        }], HM_LAYOUT, HM_CONFIG);
       }
     }
   }
@@ -199,7 +224,15 @@ function createAlignmentWidget(containerId, opts) {
           const divId = `${uid}-hm-${row}-${col}`;
           const mat = snap.mats[col] && snap.mats[col][row];
           if (!mat) continue;
-          Plotly.react(divId, [{ type: 'heatmap', z: mat.slice().reverse(), zmin: 0, zmax: 1, colorscale: HM_COLORSCALE, showscale: false, xgap: 1, ygap: 1 }], HM_LAYOUT, HM_CONFIG);
+          Plotly.react(divId, [{
+            type: 'heatmap',
+            z: mat.slice().reverse(),
+            zmin: -1, zmax: 1,
+            colorscale: HM_COLORSCALE,
+            reversescale: true,
+            showscale: false,
+            xgap: 1, ygap: 1,
+          }], HM_LAYOUT, HM_CONFIG);
         }
       }
     }
@@ -208,177 +241,148 @@ function createAlignmentWidget(containerId, opts) {
     if (iterLabel) iterLabel.textContent = `step ${snap.iter.toLocaleString()}`;
   }
 
-  // ── SVD utilities (numeric.js) ─────────────────────────────────────────────
-  function sortedSVD(mat2d) {
-    const { U, S, V } = numeric.svd(mat2d);
-    const idx = S.map((s, i) => i).sort((a, b) => S[b] - S[a]);
-    return {
-      U: U.map(row => idx.map(i => row[i])),
-      S: idx.map(i => S[i]),
-      V: V.map(row => idx.map(i => row[i])),
-    };
+  // Translate current slider value → closest snapshot and render
+  function _renderFromSlider() {
+    if (snapshots.length === 0) return;
+    const fraction = parseInt(sliderEl.value, 10) / SLIDER_RES;
+    const maxIter  = snapshots[snapshots.length - 1].iter;
+    const minIter  = snapshots[1] ? snapshots[1].iter : 100;
+
+    let targetIter = 0;
+    if (fraction > 0) {
+      targetIter = minIter * Math.pow(maxIter / minIter, fraction);
+    }
+
+    let bestIdx = 0, minDiff = Infinity;
+    for (let i = 0; i < snapshots.length; i++) {
+      const diff = Math.abs(snapshots[i].iter - targetIter);
+      if (diff < minDiff) { minDiff = diff; bestIdx = i; }
+    }
+    renderSnapshot(bestIdx);
   }
 
-  function computeAlignMats(wv) {
-    const W1 = wv[0].arraySync();
-    const W2 = wv[1].arraySync();
-    let svd1, svd2;
+  // ── Playback ──────────────────────────────────────────────────────────────
+
+  // Convert the current log-scale slider position to the nearest snapshot index.
+  function _sliderToSnapIdx() {
+    const fraction = parseInt(sliderEl.value, 10) / SLIDER_RES;
+    const maxIter  = snapshots[snapshots.length - 1].iter;
+    const minIter  = snapshots[1] ? snapshots[1].iter : 100;
+    const targetIter = fraction > 0
+      ? minIter * Math.pow(maxIter / minIter, fraction)
+      : 0;
+    let best = 0, minDiff = Infinity;
+    for (let i = 0; i < snapshots.length; i++) {
+      const d = Math.abs(snapshots[i].iter - targetIter);
+      if (d < minDiff) { minDiff = d; best = i; }
+    }
+    return best;
+  }
+
+  // Convert a snapshot index back to the log-scale slider value for display.
+  function _snapIdxToSlider(snapIdx) {
+    const iter    = snapshots[snapIdx].iter;
+    const maxIter = snapshots[snapshots.length - 1].iter;
+    const minIter = snapshots[1] ? snapshots[1].iter : 100;
+    if (iter <= 0) return 0;
+    const fraction = Math.log(iter / minIter) / Math.log(maxIter / minIter);
+    return Math.round(Math.max(0, Math.min(1, fraction)) * SLIDER_RES);
+  }
+
+  function _syncPlayBtn() {
+    if (!playBtn) return;
+    const atEnd = parseInt(sliderEl.value, 10) >= SLIDER_RES;
+    playBtn.innerHTML = isPlaying ? '&#9646;&#9646; Pause'
+                      : atEnd    ? '&#8635; Replay'
+                      :            '&#9654; Play';
+  }
+
+   function _startPlay() {
+    if (isPlaying || snapshots.length === 0) return;
+    WidgetManager.requestStart(uid);
+    isPlaying        = true;
+    
+    // FIX: Store the current slider value, NOT the snapshot index
+    playStartVal     = parseInt(sliderEl.value, 10); 
+    playStartTime    = null;
+    animFrameId      = requestAnimationFrame(_playLoop);
+    _syncPlayBtn();
+  }
+
+  function _playLoop(timestamp) {
+    if (!isPlaying) return;
+    if (playStartTime === null) playStartTime = timestamp;
+
+    const fraction = Math.min((timestamp - playStartTime) / PLAY_DURATION_MS, 1);
+    
+    // FIX: Advance linearly through the slider's log-space
+    const currentSliderVal = Math.round(playStartVal + fraction * (SLIDER_RES - playStartVal));
+    sliderEl.value = currentSliderVal; 
+
+    // Look up the nearest snapshot for this log-scaled position
+    const snapIdx = _sliderToSnapIdx();
+    renderSnapshot(snapIdx);
+
+    if (fraction >= 1) { _stopPlay(); return; }
+    animFrameId = requestAnimationFrame(_playLoop);
+  }
+
+  function _stopPlay() {
+    isPlaying = false;
+    if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+    WidgetManager.notifyStop(uid);
+    _syncPlayBtn();
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  async function loadData() {
     try {
-      svd1 = sortedSVD(W1);
-      svd2 = sortedSVD(W2);
-    } catch (_) {
-      const eye = Array.from({ length: DIMS }, (_, i) => Array.from({ length: DIMS }, (_, j) => (i === j ? 1 : 0)));
-      return [eye, eye, eye];
-    }
-    const { U: U1, V: V1 } = svd1;
-    const { U: U2, V: V2 } = svd2;
+      const response = await fetch(dataUrl);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-    const A = numeric.transpose(U2).map(r => r.map(Math.abs));
-    const B = numeric.transpose(V1).map(r => r.map(Math.abs));
-    const C = numeric.dot(numeric.transpose(V2), U1).map(r => r.map(Math.abs));
-    return [A, B, C];
-  }
+      const data = await response.json();
+      snapshots = data.snapshots;
 
-  // ── Simulation ─────────────────────────────────────────────────────────────
-  function initSim() {
-    regStates.forEach(st => {
-      st.weightVars.forEach(v => { try { v.dispose(); } catch (_) {} });
-      if (st.targetMatrix) { try { st.targetMatrix.dispose(); } catch (_) {} }
-      st.weightVars   = [];
-      st.targetMatrix = null;
-      st.lossHistory  = [];
-      st.iterCount    = 0;
-    });
-    snapshots    = [];
-    currentSnap  = 0;
-    simDone      = false;
+      populateLossChart();
 
-    regStates.forEach(st => {
-      const σ = st.cfg.initScale;
-      for (let i = 0; i < DEPTH; i++) {
-        const init = tf.randomNormal([DIMS, DIMS], 0, σ);
-        st.weightVars.push(tf.variable(init));
-        init.dispose();
-      }
-      const dv = tf.tensor1d(Array.from({ length: DIMS }, (_, i) => (DIMS - i) / (DIMS + 1)));
-      st.targetMatrix = tf.diag(dv);
-      dv.dispose();
-    });
-  }
+      // Show final snapshot by default
+      sliderEl.value    = SLIDER_RES;
+      sliderEl.disabled = false;
+      playBtn.disabled  = false;
 
-  function stepRegime(st) {
-    tf.tidy(() => {
-      const result = tf.variableGrads(() => {
-        let e2e = st.weightVars[0];
-        for (let i = 1; i < st.weightVars.length; i++) e2e = tf.matMul(st.weightVars[i], e2e);
-        return tf.sum(tf.square(tf.sub(e2e, st.targetMatrix)));
-      });
-      st.weightVars.forEach(v => {
-        const g = result.grads[v.name];
-        if (g) v.assign(tf.sub(v, tf.mul(g, st.cfg.lr)));
-      });
-    });
-  }
+      renderSnapshot(snapshots.length - 1);
+      if (statusEl) statusEl.textContent = 'Drag the slider or press Play to explore.';
+      _syncPlayBtn();
 
-  function getLoss(st) {
-    return tf.tidy(() => {
-      let e2e = st.weightVars[0];
-      for (let i = 1; i < st.weightVars.length; i++) e2e = tf.matMul(st.weightVars[i], e2e);
-      return tf.sum(tf.square(tf.sub(e2e, st.targetMatrix))).dataSync()[0];
-    });
-  }
-
-  function recordSnapshot() {
-    const iter  = regStates[0].iterCount;
-    const loss  = regStates.map(st => {
-      const h = st.lossHistory;
-      return h.length > 0 ? h[h.length - 1].loss : NaN;
-    });
-    const mats  = regStates.map(st => st.weightVars.length >= 2 ? computeAlignMats(st.weightVars) : [null, null, null]);
-    snapshots.push({ iter, loss, mats });
-  }
-
-  // ── Async Compute Loop ─────────────────────────────────────────────────────
-  async function _computeAll() {
-    if (isComputing) return;
-    if (regStates[0].weightVars.length === 0) initSim();
-    
-    isComputing = true;
-    statusEl.textContent = 'Computing SVDs & Trajectory...';
-    sliderEl.disabled = true;
-
-    // Record initial step 0
-    recordSnapshot();
-    
-    while (!simDone) {
-      const prevIter = regStates[0].iterCount;
-
-      for (let s = 0; s < CHUNK_SIZE; s++) {
-        regStates.forEach(st => { stepRegime(st); st.iterCount++; });
-      }
-
-      regStates.forEach(st => {
-        const loss = getLoss(st);
-        st.lossHistory.push({ iter: st.iterCount, loss });
-      });
-
-      const newIter = regStates[0].iterCount;
-      if (Math.floor(prevIter / RECORD_EVERY) < Math.floor(newIter / RECORD_EVERY)) {
-        recordSnapshot();
-      }
-
-      const pct = Math.round((newIter / MAX_ITERS) * 100);
-      statusEl.textContent = `Computing... ${pct}%`;
-
-      if (newIter >= MAX_ITERS) {
-        simDone = true;
-        // ensure final step is recorded if it didn't align cleanly
-        if (newIter % RECORD_EVERY !== 0) recordSnapshot();
-      }
-
-      await tf.nextFrame();
-    }
-
-    isComputing = false;
-    statusEl.textContent = 'Done. Drag the slider to explore.';
-    
-    // Setup slider bounds
-    sliderEl.max = snapshots.length - 1;
-    sliderEl.value = snapshots.length - 1;
-    sliderEl.disabled = false;
-    
-    // Draw fully populated loss chart and latest matrices
-    updateLossChart();
-    currentSnap = snapshots.length - 1;
-    renderSnapshot(currentSnap);
-  }
-
-  function _resetAndCompute() {
-    initSim();
-    
-    if (lossChart) {
-      REGIMES.forEach((r, ri) => { lossChart.data.datasets[ri].data = []; });
-      lossChart.data.datasets[3].data = [];
-      lossChart.update('none');
-    }
-
-    const blank = emptyZ();
-    if (typeof Plotly !== 'undefined') {
-      for (let row = 0; row < 3; row++) {
-        for (let col = 0; col < 3; col++) {
-          Plotly.react(`${uid}-hm-${row}-${col}`, [{ type: 'heatmap', z: blank, zmin: 0, zmax: 1, colorscale: HM_COLORSCALE, showscale: false, xgap: 1, ygap: 1 }], HM_LAYOUT, HM_CONFIG);
-        }
+    } catch (error) {
+      console.error('Failed to load alignment data:', error);
+      if (statusEl) {
+        statusEl.textContent = 'Error loading data.';
+        statusEl.style.color = '#d1242f';
       }
     }
-    
-    _computeAll();
   }
 
-  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  // ── Scroll autoplay ───────────────────────────────────────────────────────
+
+  function _autoplayStart() {
+    if (snapshots.length === 0) return;
+    sliderEl.value = 0;
+    _renderFromSlider();
+    _startPlay();
+  }
+
+  // ── Bootstrap ─────────────────────────────────────────────────────────────
+
   buildDOM();
   initChart();
   initHeatmaps();
-  if (opts.autoStart !== false) _resetAndCompute();
+  WidgetManager.register(uid, _stopPlay);
 
-  return { reset: _resetAndCompute };
+  if (dataUrl) {
+    loadData().then(() => {
+      dlnScrollAutoplay(root, _autoplayStart);
+    });
+  }
 }

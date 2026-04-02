@@ -37,7 +37,7 @@ function createLossWidget(containerId, opts) {
   let stopAtWall   = null;
 
   let chart = null;
-  let uid   = dlnUID();
+  const uid = dlnUID();
   let root  = null;
 
   // ── DOM ────────────────────────────────────────────────────────────────────
@@ -51,31 +51,29 @@ function createLossWidget(containerId, opts) {
       `<button class="dln-btn dln-depth-btn${d === depth ? ' active' : ''}" data-depth="${d}">${d}</button>`
     ).join('');
 
-    // Target scale slider: linear 0.1→1.0 displayed value
     const initSliderVal = Math.round((targetScale - 0.1) / 0.9 * 100);
 
     root.innerHTML = `
       <div class="dln-widget-controls">
         <div class="dln-ctrl-group">
-          <span class="dln-ctrl-label">depth</span>
+          <span class="dln-ctrl-label">Depth</span>
           <div class="dln-btn-row">${depthBtns}</div>
         </div>
         <div class="dln-ctrl-group">
-          <span class="dln-ctrl-label">target scale</span>
+          <span class="dln-ctrl-label">Target scale</span>
           <input class="dln-slider dln-scale-slider" type="range"
                  min="0" max="100" value="${initSliderVal}">
           <span class="dln-scale-display">${targetScale.toFixed(1)}</span>
         </div>
-        <div class="dln-ctrl-group dln-ctrl-right">
-          <button class="dln-btn dln-play-btn">&#9654; start</button>
-          <button class="dln-btn dln-reset-btn">&#8635; reset</button>
+        <div class="dln-ctrl-group" style="margin-left:auto;gap:6px;">
+          <button class="dln-btn dln-play-btn">&#9654; Start</button>
+          <button class="dln-btn dln-reset-btn">Reset</button>
         </div>
       </div>
       <div class="dln-chart-wrap">
         <canvas id="${uid}-loss"></canvas>
       </div>`;
 
-    // Depth buttons
     root.querySelectorAll('.dln-depth-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         depth = parseInt(btn.dataset.depth);
@@ -86,7 +84,6 @@ function createLossWidget(containerId, opts) {
       });
     });
 
-    // Scale slider
     const slider  = root.querySelector('.dln-scale-slider');
     const display = root.querySelector('.dln-scale-display');
     slider.addEventListener('input', () => {
@@ -118,7 +115,7 @@ function createLossWidget(containerId, opts) {
         datasets: [{
           data: [],
           borderColor: '#0969da',
-          backgroundColor: 'rgba(9,105,218,0.06)',
+          backgroundColor: 'rgba(9,105,218,0.05)',
           borderWidth: 1.5,
           pointRadius: 0,
           tension: 0,
@@ -165,14 +162,12 @@ function createLossWidget(containerId, opts) {
       init.dispose();
     }
 
-    // Target: equally spaced SVs, all scaled by targetScale
     const diagVals = tf.tensor1d(
       Array.from({ length: DIMS }, (_, i) => targetScale * (DIMS - i) / (DIMS + 1))
     );
     targetMatrix = tf.diag(diagVals);
     diagVals.dispose();
 
-    // Aligned init so theory would apply (makes plateaus clean)
     dlnAlignedInit(weightVars, dims, targetMatrix, INIT_SCALE);
   }
 
@@ -198,7 +193,6 @@ function createLossWidget(containerId, opts) {
 
   function _checkStop(loss) {
     if (iterCount > MAX_ITERS) { _finish(); return true; }
-    // Initial loss ≈ sum(s_i^2) for small init; threshold at 0.5% of initial range
     const threshold = targetScale * targetScale * 0.005;
     if (stopAt === null && loss < threshold) {
       stopAt     = iterCount * 3;
@@ -233,13 +227,14 @@ function createLossWidget(containerId, opts) {
   function _syncPlayBtn() {
     const btn = root && root.querySelector('.dln-play-btn');
     if (!btn) return;
-    btn.innerHTML = completed ? '&#8635; replay'
-                  : isRunning ? '&#9646;&#9646; pause'
-                  : '&#9654; start';
+    btn.innerHTML = completed ? '&#8635; Replay'
+                  : isRunning ? '&#9646;&#9646; Pause'
+                  : '&#9654; Start';
   }
 
   function _start() {
     if (isRunning) return;
+    WidgetManager.requestStart(uid);
     if (weightVars.length === 0) _initSim();
     isRunning = true;
     _syncPlayBtn();
@@ -249,6 +244,7 @@ function createLossWidget(containerId, opts) {
   function _pause() {
     isRunning = false;
     if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+    WidgetManager.notifyStop(uid);
     _syncPlayBtn();
   }
 
@@ -264,7 +260,12 @@ function createLossWidget(containerId, opts) {
   buildDOM();
   _initChart();
   _initSim();
-  if (opts.autoStart !== false) _start();
+  WidgetManager.register(uid, _pause);
+  if (opts.autoStart !== false) {
+    _start();
+  } else {
+    dlnScrollAutoplay(root, _start);
+  }
 
   return { start: _start, pause: _pause, reset: _reset };
 }
